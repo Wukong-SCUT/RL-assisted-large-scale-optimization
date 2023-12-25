@@ -1,0 +1,18 @@
+Metadata-Version: 1.0
+Name: rollout
+Version: 0.3
+Summary: Use Proclaim to release features to target users inside your Django project.
+Home-page: http://github.com/e-loue/rollout
+Author: Timothée Peignier
+Author-email: timothee.peignier@tryphon.org
+License: MIT
+Download-URL: http://github.com/e-loue/rollout/downloads
+Description: Conditionally roll out features with Redis by assigning
+            percentages, groups or users to features.
+Keywords: redis rollout proclaim django
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Software Development
