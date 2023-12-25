@@ -20,7 +20,7 @@ import copy
 #from utils.make_dataset import make_dataset
 from rollout import rollout
 
-
+# train the model
 # memory for recording transition during training process
 class Memory:
     def __init__(self):
