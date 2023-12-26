@@ -20,7 +20,7 @@ import copy
 #from utils.make_dataset import make_dataset
 from rollout import rollout
 
-# train the model
+
 # memory for recording transition during training process
 class Memory:
     def __init__(self):
@@ -35,7 +35,7 @@ class Memory:
         del self.logprobs[:]
         del self.rewards[:]
 
-
+# control the learning rate decay
 def lr_sd(epoch, opts):
     return opts.lr_decay ** epoch
 
@@ -83,7 +83,6 @@ class PPO:
                 hidden_dim1 = opts.hidden_dim1_critic,
                 hidden_dim2 = opts.hidden_dim2_critic,
             )
-
             # figure out the optimizer
             self.optimizer = torch.optim.Adam(
                 [{'params': self.actor.parameters(), 'lr': opts.lr_model}] +

@@ -127,9 +127,9 @@ method_mapping_num = {
 def problem(x):
     global fes
     fes += sub_popsize
-    #x = np.ascontiguousarray(x)
-    x = np.array(x)
-    return F3.func(x) #fun_fitness(x)F3.func(x)
+    x = np.ascontiguousarray(x)
+    #x = np.array(x)
+    return fun_fitness(x) #fun_fitness(x)F3.func(x)
 
 # cec接口
 # func = F82013(D)
@@ -163,7 +163,7 @@ global_C = np.eye(D)
 global_Xw = np.random.uniform(info['lower'], info['upper'], size=D)
 
 # 计算每个向量对应的函数值
-function_values = problem(random_vectors)
+function_values = np.array([problem(random_vectors[i]) for i in np.arange(200)])
 
 # 找到最小值和对应的索引
 min_index = np.argmin(function_values)
@@ -247,7 +247,7 @@ for _ in tqdm(range(300),desc = "Overall Process"): #fes = 3e6:
                 sub_offspring_to_global.append(sub_ind_to_global)
 
             #计算子代的fitness
-            sub_es.tell(offspring, problem(sub_offspring_to_global)) #更新子代
+            sub_es.tell(offspring, np.array([problem(sub_offspring_to_global[i]) for i in range(sub_popsize)])) #更新子代
 
             #从子代中提取最优解
             sub_best = sub_es.result[0]
