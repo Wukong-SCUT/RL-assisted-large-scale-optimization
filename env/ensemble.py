@@ -13,30 +13,30 @@ import collections
 
 class Ensemble(gym.Env):
     def __init__(self, optimizers, problem, period, MaxFEs, sample_times, sample_size, seed=0, qr_len=5, record_period=-1, sample_FEs_type=2, terminal_error=1e-8):
-        self.dim = problem.dim
+        self.dim = problem.dim 
         self.MaxFEs = MaxFEs
-        self.period = period
-        self.max_step = MaxFEs // period
+        self.period = period #每个优化器执行优化步骤的时间周期
+        self.max_step = MaxFEs // period 
         self.optimizers = []
         for optimizer in optimizers:
-            self.optimizers.append(eval(optimizer)(self.dim, terminal_error))
-        self.sample_size = sample_size
+            self.optimizers.append(eval(optimizer)(self.dim, terminal_error)) #初始化优化器
+        self.sample_size = sample_size 
         self.sample_times = sample_times
         self.best_history = [[] for _ in range(len(optimizers))]
         self.worst_history = [[] for _ in range(len(optimizers))]
-        self.q_r_history = [np.zeros(len(self.optimizers) + 1)] * qr_len
+        self.q_r_history = [np.zeros(len(self.optimizers) + 1)] * qr_len #用于存储q值和奖励历史的列表
         self.qr_len = qr_len
-        self.optimzer_used = np.zeros(len(self.optimizers))
+        self.optimzer_used = np.zeros(len(self.optimizers)) #用于记录每个优化器被使用的次数
 
         self.problem = problem
-        self.n_dim_obs = 6
+        self.n_dim_obs = 6 #观测空间的维度 为什么是6？
         self.observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
             shape=(self.n_dim_obs,),
             dtype=np.float32,
-        )
-        self.action_space = spaces.Discrete(len(self.optimizers))
+        ) #观测空间
+        self.action_space = spaces.Discrete(len(self.optimizers)) #动作空间
         self.sample_FEs_type = sample_FEs_type
         self.baseline = False
         if record_period > 0:

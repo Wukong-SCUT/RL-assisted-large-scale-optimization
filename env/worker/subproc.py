@@ -8,7 +8,7 @@ from typing import Any, Callable, List, Optional, Tuple, Union
 import gym
 import numpy as np
 
-from env.utils import CloudpickleWrapper
+from env.worker import CloudpickleWrapper
 from env.worker import EnvWorker
 
 _NP_TO_CT = {

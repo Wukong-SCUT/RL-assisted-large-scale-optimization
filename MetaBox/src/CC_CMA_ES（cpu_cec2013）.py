@@ -204,7 +204,7 @@ for _ in tqdm(range(300),desc = "Overall Process"): #fes = 3e6:
     #进入子空间 
     for i in range(m):
 
-        sub_dimosions = len(init_vector.elements[i]) # 子代的维度
+        #sub_dimosions = len(init_vector.elements[i]) # 子代的维度
 
         # 从全局中提取子代的 centroid
         pos = init_vector.positions[i]

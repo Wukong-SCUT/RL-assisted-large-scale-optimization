@@ -3,23 +3,22 @@ import warnings
 import torch
 import numpy as np
 from tqdm import tqdm
-# from tensorboardX import SummaryWriter
-# import torch.multiprocessing as mp
-# import torch.distributed as dist
-from Ppo.utils.utils import set_random_seed
-from Ppo.utils.utils import clip_grad_norms
-from Ppo.nets_transformer.actor_network import Actor
-from Ppo.nets_transformer.critic_network import Critic
-from Ppo.utils.utils import torch_load_cpu, get_inner_model
-from Ppo.utils.logger import log_to_tb_train, log_to_tb_val
-# import copy
+from tensorboardX import SummaryWriter
+import torch.multiprocessing as mp
+import torch.distributed as dist
+from utils.utils import set_random_seed
+from utils.utils import clip_grad_norms
+from nets_transformer.actor_network import Actor
+from nets_transformer.critic_network import Critic
+from utils.utils import torch_load_cpu, get_inner_model
+from utils.logger import log_to_tb_train, log_to_tb_val
+import copy
 #from problems.gpso_np import GPSO_numpy
 #from problems.dmspso import DMS_PSO_np
 #from problems.de_np import DE_np
 #from problems.madde import MadDE
-from Ppo.utils.make_dataset import Make_dataset
-from rollout import rollout
-from env.basic_env import cmaes
+#from utils.make_dataset import make_dataset
+from RL_assist.rollout import rollout
 
 
 # memory for recording transition during training process
@@ -170,12 +169,28 @@ def train(rank, agent, tb_logger):
 
     # generatate the train_dataset and test_dataset
     set_random_seed(opts.train_dataset_seed)
-    training_dataloader = Make_dataset.train_problem_set( )
+    training_dataloader = make_dataset(dim=opts.dim,
+                                       batch_size=opts.batch_size,
+                                       max_x=opts.max_x,
+                                       min_x=-opts.max_x,
+                                       num_samples=opts.epoch_size,
+                                       problem_id=opts.problem,
+                                       shifted=opts.shift,
+                                       rotated=opts.rotate
+                                       )
     if opts.epoch_size==1:
         test_dataloader=training_dataloader
     else:
         set_random_seed(opts.test_dataset_seed)
-        test_dataloader = Make_dataset.test_problem_set( )
+        test_dataloader=make_dataset(dim=opts.dim,
+                                        batch_size=opts.batch_size,
+                                        max_x=opts.max_x,
+                                        min_x=-opts.max_x,
+                                        num_samples=opts.val_size,
+                                        problem_id=opts.problem,
+                                        shifted=opts.shift,
+                                        rotated=opts.rotate
+                                        )
 
 
     best_epoch=None
@@ -221,13 +236,12 @@ def train(rank, agent, tb_logger):
                     bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}')
 
         for batch_id, batch in enumerate(training_dataloader):
-            backbone = cmaes
-            # backbone={
-            #     'PSO':GPSO_numpy,
-            #     'DMSPSO':DMS_PSO_np,
-            #     'DE':DE_np,
-            #     'madde':MadDE
-            # }.get(opts.backbone,None)
+            backbone={
+                'PSO':GPSO_numpy,
+                'DMSPSO':DMS_PSO_np,
+                'DE':DE_np,
+                'madde':MadDE
+            }.get(opts.backbone,None)
             assert backbone is not None,'Backbone algorithm is currently not supported'
             env_list=[lambda e=p: backbone(dim = opts.dim,
                                              max_velocity = opts.max_velocity,
@@ -343,7 +357,10 @@ def train_batch(
         while t - t_s < n_step :  
             
             memory.states.append(state.clone())
-            action, log_lh, entro_p = agent.actor(state) #action，log_lh, entro_p ,去掉to
+            action, log_lh,_to_critic,  entro_p  = agent.actor(state,
+                                                    require_entropy = True,
+                                                    to_critic=True
+                                                    )
             
 
             memory.actions.append(action.clone())
@@ -352,7 +369,7 @@ def train_batch(
 
             entropy.append(entro_p.detach().cpu())
 
-            baseline_val_detached, baseline_val = agent.critic(state) #直接把state放入即可
+            baseline_val_detached, baseline_val = agent.critic(_to_critic)
             bl_val_detached.append(baseline_val_detached)
             bl_val.append(baseline_val)
 
@@ -403,14 +420,16 @@ def train_batch(
                 for tt in range(t_time):
 
                     # get new action_prob
-                    _, log_p,  entro_p = agent.actor(old_states[tt],
+                    _, log_p,_to_critic,  entro_p = agent.actor(old_states[tt],
                                                      fixed_action = old_actions[tt],
+                                                     require_entropy = True,# take same action
+                                                     to_critic = True
                                                      )
 
                     logprobs.append(log_p)
                     entropy.append(entro_p.detach().cpu())
 
-                    baseline_val_detached, baseline_val = agent.critic(state)
+                    baseline_val_detached, baseline_val = agent.critic(_to_critic)
 
                     bl_val_detached.append(baseline_val_detached)
                     bl_val.append(baseline_val)
