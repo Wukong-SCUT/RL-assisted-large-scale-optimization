@@ -170,8 +170,8 @@ def train(rank, agent, tb_logger):
 
     # generatate the train_dataset and test_dataset
     set_random_seed(opts.train_dataset_seed)
-    training_dataloader = Make_dataset.train_problem_set( )
-    if opts.epoch_size==1:
+    training_dataloader = Make_dataset.train_problem_set( )   
+    if opts.epoch_size==1: 
         test_dataloader=training_dataloader
     else:
         set_random_seed(opts.test_dataset_seed)
@@ -200,7 +200,8 @@ def train(rank, agent, tb_logger):
     for epoch in range(opts.epoch_start, opts.epoch_end):
         # Training mode
         set_random_seed()
-        agent.train()
+        agent.train() #此处只是将actor和critic的状态都设置为train
+
         # agent.lr_scheduler_critic.step(epoch)
         # agent.lr_scheduler_actor.step(epoch)
         agent.lr_scheduler.step(epoch)
@@ -220,7 +221,8 @@ def train(rank, agent, tb_logger):
                     disable = opts.no_progress_bar or rank!=0, desc = 'training',
                     bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}')
 
-        for batch_id, batch in enumerate(training_dataloader):
+        for question in enumerate(training_dataloader):
+            batch = 10 #此处batch是指每个问题的环境数量
             backbone = cmaes
             # backbone={
             #     'PSO':GPSO_numpy,
@@ -229,12 +231,7 @@ def train(rank, agent, tb_logger):
             #     'madde':MadDE
             # }.get(opts.backbone,None)
             assert backbone is not None,'Backbone algorithm is currently not supported'
-            env_list=[lambda e=p: backbone(dim = opts.dim,
-                                             max_velocity = opts.max_velocity,
-                                             reward_scale = opts.reward_scale,
-                                             ps=opts.population_size,problem=e,
-                                             max_fes=opts.max_fes,max_x=opts.max_x,boarder_method=opts.boarder_method,
-                                             reward_func=opts.reward_func,w_decay=opts.w_decay) for p in batch]
+            env_list=[lambda e=p: backbone(m=opts.m,sub_popsize=opts.sub_popsize,question=question) for p in batch]
             envs=agent.vector_env(env_list)
             # train procedule for a batch
 
@@ -247,7 +244,8 @@ def train(rank, agent, tb_logger):
                                 tb_logger,
                                 opts,
                                 pbar,
-                                batch_id)
+                                question)
+            
             pre_step += batch_step
             envs.close()
             # see if the learning step reach the max_learning_step, if so, stop training
@@ -425,7 +423,7 @@ def train_batch(
             Reward = []
             reward_reversed = memory.rewards[::-1]
             # get next value
-            R = agent.critic(agent.actor(state,only_critic = True))[0]
+            R = agent.critic(agent.actor(state,only_critic = True))[0]  #这里only_critic=True，所以actor的输出是critic的输入
 
             # R = agent.critic(x_in)[0]
             critic_output=R.clone()

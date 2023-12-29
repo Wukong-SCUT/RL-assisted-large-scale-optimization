@@ -8,8 +8,9 @@ def get_options(args=None):
 
     parser = argparse.ArgumentParser(description="CMAES_PPO")
 
+    # CMAES settings
+    parser.add_argument('--backbone', default='cmaes', choices=['cmaes'], help='backbone algorithm')
     
-
 
 
 

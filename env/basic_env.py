@@ -82,13 +82,12 @@ def RD(D,m,C,best):
     return group_best
 
 class cmaes(gym.Env):
-    def __init__(self, m, sub_popsize, action ,question):
+    def __init__(self, m, sub_popsize,question):
         super(cmaes, self).__init__() 
         bench = Benchmark()
 
         self.m = m
         self.sub_popsize = sub_popsize
-        self.action = action
         self.info = bench.get_info(question)
         self.D = self.info["dimension"]
         self.ub = self.info['upper']
@@ -135,13 +134,14 @@ class cmaes(gym.Env):
 
         return self.state
 
-    def step(self):
+    def step(self, action):
+
         # 执行动作，更新环境状态，并返回新的状态、奖励、是否终止以及额外信息
-        if self.action == 0:
+        if action == 0:
             init_vector = MiVD(self.D,self.m,self.global_C,self.best)
-        elif self.action == 1:
+        elif action == 1:
             init_vector = MaVD(self.D,self.m,self.global_C,self.best)
-        elif self.action == 2:
+        elif action == 2:
             init_vector = RD(self.D,self.m,self.global_C,self.best)
         
 

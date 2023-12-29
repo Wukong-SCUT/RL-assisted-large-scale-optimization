@@ -6,13 +6,15 @@ from Ppo.utils.logger import log_to_tb_val
 import os
 from env.venvs import DummyVectorEnv,SubprocVectorEnv
 from env.basic_env import cmaes
+from Ppo.nets_transformer.actor_network import Actor
+
 # interface for rollout
 def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
 
     rollout_name=f'func_{opts.problem}_{opts.backbone}'
     if agent:
         rollout_name='GLEET-'+rollout_name
-        agent.eval()
+        agent.eval() 
     T = opts.max_fes // opts.population_size+1
 
     # to store the whole rollout process
@@ -31,28 +33,26 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
         #     'PSO':GPSO_numpy,
         #     'DMSPSO':DMS_PSO_np,
         # }.get(opts.backbone,None)
-        backbone=cmaes
+        
+        #action, _, _ = Actor(input_dim=opts.dim, state=opts.dim+1)  #注意这里只是一个示例，并非真正的actor
+
+        backbone=cmaes #此处为基础环境
         assert backbone is not None,'Backbone algorithm is currently not supported'
         # see if there is agent to aid the backbone
         origin=True
         if agent:
             origin=False
-        env_list=[lambda e=p: backbone(dim = opts.dim,
-                                            max_velocity = opts.max_velocity,
-                                            reward_scale = opts.reward_scale,
-                                            ps=opts.population_size,problem=e,origin=origin,
-                                            max_fes=opts.max_fes,max_x=opts.max_x,boarder_method=opts.boarder_method,
-                                            reward_func=opts.reward_func,w_decay=opts.w_decay) for p in batch]
+        env_list=[lambda e=p: backbone(m=opts.m,sub_popsize=opts.sub_popsize,question=dataloader) for p in batch]  #注意此处只是一个示例
         # Parallel environmen SubprocVectorEnv can only be used in Linux
         vector_env=SubprocVectorEnv if opts.is_linux else DummyVectorEnv
-        problem=vector_env(env_list)
+        problem=vector_env(env_list)  #此处problem就是为基础环境
 
         # list to store the final optimization result
         collect_gbest=np.zeros((opts.batch_size,opts.per_eval_time))
         for i in range(opts.per_eval_time):
             # reset the backbone algorithm
             is_end=False
-            state=problem.reset()
+            state=problem.reset()  
             
             if agent:
                 state=torch.FloatTensor(state).to(opts.device)
@@ -65,7 +65,7 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
                 
                 if agent:
                     # if RL_agent is provided, the action is from the agent.actor
-                    action,_,_to_critic = agent.actor(state,to_critic=True)
+                    action,_,_ = agent.actor(state)
                     action=action.cpu().numpy()
                 else:
                     # if RL_agent is not provided, the action is set to zeros because of the need of the parallel environment,
@@ -89,6 +89,7 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
                     for tt in range(opts.batch_size):
                         collect_gbest[tt,i]=info[tt]['gbest_val']
                     break
+        
         # collect the mean and std of final cost
         collect_std.append(np.mean(np.std(collect_gbest,axis=-1)).item())
         collect_mean.append(np.mean(collect_gbest).item())
