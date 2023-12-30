@@ -49,29 +49,7 @@ class PPO:
         # the parallel environment
         self.vector_env=vector_env
         # figure out the actor network
-        self.actor = Actor(
-                            opts.Xw_mean_var, # 均值差方差
-                            opts.Xw_mean, # 均值均值
-                            opts.Xw_max, # 均值最大值
-                            opts.Xw_min, # 均值最小值
-                            opts.Xw_std, # 均值标准差
-
-                            opts.correlation_matrix_max, # 相关系数矩阵最大值
-                            opts.correlation_matrix_min, # 相关系数矩阵最小值
-                            opts.correlation_matrix_mean, # 相关系数矩阵均值
-                            
-                            opts.g_best_max, # 全局最优值最大值
-                            opts.g_best_min, # 全局最优值最小值
-                            opts.g_best_mean, # 全局最优值均值
-                            opts.g_best_std, # 全局最优值标准差
-
-                            opts.g_best_fitness, # 全局最优适应度
-                            opts.g_best_fitness_boosting_ratio, # 全局最优适应度提升比例
-
-                            opts.fes_remaining, # 剩余评价次数
-
-                            opts.sigma, # 标准差
-        )
+        self.actor = Actor(opts.state)
 
         if not opts.test:
             # for the sake of ablation study, figure out the input_dim for critic according to setting

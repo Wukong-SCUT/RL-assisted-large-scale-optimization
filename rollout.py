@@ -8,6 +8,7 @@ from env.venvs import DummyVectorEnv,SubprocVectorEnv
 from env.basic_env import cmaes
 from Ppo.nets_transformer.actor_network import Actor
 
+
 # interface for rollout
 def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
 
@@ -18,7 +19,7 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
     T = opts.max_fes // opts.population_size+1
 
     # to store the whole rollout process
-    cost_rollout=np.zeros((opts.batch_size,T-1))
+    cost_rollout=np.zeros((opts.batch_size,int(T-1)))
     
     time_eval=0
     collect_mean=[]
@@ -27,7 +28,8 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
     
     # set the same random seed before rollout for the sake of fairness
     set_random_seed(42)
-    for batch in range(len(dataloader)):
+    for question in dataloader:
+        batch = range(10)
         # figure out the backbone algorithm
         # backbone={
         #     'PSO':GPSO_numpy,
@@ -42,13 +44,14 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
         origin=True
         if agent:
             origin=False
-        env_list=[lambda e=p: backbone(m=opts.m,sub_popsize=opts.sub_popsize,question=dataloader) for p in batch]  #注意此处只是一个示例
+        env_list=env_list = [lambda e=p: backbone(question) for p in batch]  #注意此处只是一个示例
         # Parallel environmen SubprocVectorEnv can only be used in Linux
-        vector_env=SubprocVectorEnv if opts.is_linux else DummyVectorEnv
+        vector_env=SubprocVectorEnv #if opts.is_linux else DummyVectorEnv
         problem=vector_env(env_list)  #此处problem就是为基础环境
 
         # list to store the final optimization result
         collect_gbest=np.zeros((opts.batch_size,opts.per_eval_time))
+
         for i in range(opts.per_eval_time):
             # reset the backbone algorithm
             is_end=False
@@ -60,20 +63,29 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
             time_eval+=1
             
             # visualize the rollout process
-            for t in tqdm(range(T), disable = opts.no_progress_bar,
+            for t in tqdm(range(int(T)), disable = opts.no_progress_bar,
                             desc = rollout_name, bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
                 
-                if agent:
-                    # if RL_agent is provided, the action is from the agent.actor
-                    action,_,_ = agent.actor(state)
-                    action=action.cpu().numpy()
-                else:
-                    # if RL_agent is not provided, the action is set to zeros because of the need of the parallel environment,
-                    # but inside the backbone algorithm, the parameter controlled by action will use the default choices
-                    action=np.zeros(opts.batch_size)
+                action_test = []
+                for i in range(10):
+                    state_i = state[i]
+                    state_i = state_i.astype(np.float32)
+                    actor = Actor(state_i)
+                    action,_,_ = actor.forward()
+                    action_test.append(action)
+
+                # if agent:
+                #     # if RL_agent is provided, the action is from the agent.actor
+                #     action,_,_ = agent.actor(state)
+                #     action=action.cpu().numpy()
+                # else:
+                #     # if RL_agent is not provided, the action is set to zeros because of the need of the parallel environment,
+                #     # but inside the backbone algorithm, the parameter controlled by action will use the default choices
+                #     action=np.zeros(opts.batch_size)
                 
                 # put action into environment(backbone algorithm to be specific)
-                next_state,rewards,is_end,info = problem.step(action)
+                next_state,rewards,is_end,info = problem.step(action_test)
+
                 state=next_state
                 if agent:
                     state=torch.FloatTensor(state).to(opts.device)
@@ -115,3 +127,9 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
     
     # calculate and return the mean and std of final cost
     return np.mean(collect_gbest).item(),np.mean(collect_std).item()
+
+#测试
+dataloader = [1,2,3]
+from options import get_options
+opts = get_options()
+rollout(dataloader,opts)

@@ -37,7 +37,7 @@ class Actor(nn.Module):
     def __init__(self,state):
         super(Actor, self).__init__()
 
-        self.input_dim = 17 #和state+1的维度一致
+        self.input_dim = 16 #和state+1的维度一致
         
         self.state = state
 
@@ -91,18 +91,20 @@ class Actor(nn.Module):
 
 
 # # 创建一个 Actor 实例
-# actor = Actor(Xw_mean_var=1.0, Xw_mean=2.0, Xw_max=3.0, Xw_min=0.5, Xw_std=0.2,
-#               correlation_matrix_max=0.9, correlation_matrix_min=0.1, correlation_matrix_mean=0.5,
-#               g_best_max=10.0, g_best_min=1.0, g_best_mean=5.0, g_best_std=2.0,
-#               g_best_fitness=100.0, g_best_fitness_boosting_ratio=0.2,
-#               fes_remaining=500, sigma=0.01)
+# actor = Actor(state=[1.0, 2.0, 3.0, 0.5, 0.2,
+#               0.9, 0.1, 0.5,
+#               10.0, 1.0, 5.0, 2.0,
+#               100.0, 0.2,
+#               500, 0.01 ])
 
 # # 打印模型参数
 # print(actor.get_parameter_number())
 
 # # 使用 forward 方法得到输出
 # output = actor()
+# action,_,_ = actor()
 # print(output)
+# print(action.item())
 
 
 # 创建 Actor 模型

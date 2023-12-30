@@ -5,7 +5,7 @@ import numpy as np
 import cma
 import warnings
 
-from RL_assist import options as opts
+#from RL_assist import options as opts
 from cec2013lsgo.cec2013 import Benchmark
 
 # 保存原始的 sys.stdout
@@ -82,43 +82,36 @@ def RD(D,m,C,best):
 
     return group_best
 
+
 class cmaes(gym.Env):
-    def __init__(self, opts.m, opts.sub_popsize, question):
+    def __init__(self, question):
         super(cmaes, self).__init__() 
         bench = Benchmark()
 
-        question = question
-        self.m = opts.m
-        self.sub_popsize = opts.sub_popsize
+        self.m = 20 #opts.m
+        self.sub_popsize = 50 #opts.sub_popsize
+
+        self.fes = 0
 
         self.info = bench.get_info(question)
         self.D = self.info["dimension"]
         self.ub = self.info['upper']
         self.lb = self.info['lower']
         self.sigma = (self.ub - self.lb) * 0.5
+
         self.fun_fitness = bench.get_function(question)
 
         # 定义状态和动作空间
-        self.observation_space = spaces.Box(low=0, high=1, shape=(3,), dtype=np.float32) #此处还没有设置好
+        self.observation_space = spaces.Box(low=-np.inf ,high=np.inf, shape=(16,1), dtype=np.float32) #此处还没有设置好
 
         self.action_space = spaces.Discrete(3)
 
-        Xw_mean_var=1.0, 
-        Xw_mean=2.0, 
-        Xw_max=3.0, 
-        Xw_min=0.5, 
-        Xw_std=0.2,
-              correlation_matrix_max=0.9, correlation_matrix_min=0.1, correlation_matrix_mean=0.5,
-              g_best_max=10.0, g_best_min=1.0, g_best_mean=5.0, g_best_std=2.0,
-              g_best_fitness=100.0, g_best_fitness_boosting_ratio=0.2,
-              fes_remaining=500, sigma=0.01
         # 初始化环境的内部状态等
-        self.state = 
+        self.state = []#此处还没有设置好
         self.done = False
 
     def problem(self,x):
-        global fes
-        fes += self.sub_popsize
+        self.fes += self.sub_popsize
         x = np.ascontiguousarray(x)
         return self.fun_fitness(x)
 
@@ -140,14 +133,45 @@ class cmaes(gym.Env):
 
         self.fes = 0
 
+        Xw_var = np.std(self.global_Xw)
+        Xw_mean = np.mean(self.global_Xw)
+        Xw_max = np.max(self.global_Xw)
+        Xw_min = np.min(self.global_Xw)
+
+        # 使用 np.corrcoef 计算相关系数矩阵
+        correlation_matrix = np.corrcoef(self.global_C)
+
+        correlation_matrix_max = np.max(correlation_matrix)
+        correlation_matrix_min = np.min(correlation_matrix)
+        correlation_matrix_mean = np.mean(correlation_matrix)
+
+        g_best_max = np.max(self.best)
+        g_best_min = np.min(self.best)
+        g_best_mean = np.mean(self.best)
+        g_best_std = np.std(self.best)
+
+        g_best_fitness = self.best_fitness
+        g_best_fitness_boosting_ratio = 1
+
+        fes_remaining = 3e6 - self.fes
+
+        sigma = (self.ub - self.lb) * 0.5
+
         self.done = False
 
-        self.state = np.zeros(3) #此处还没有设置好
+        self.state = [
+            Xw_var, Xw_mean, Xw_max, Xw_min,
+            correlation_matrix_max, correlation_matrix_min, correlation_matrix_mean,
+            g_best_max, g_best_min, g_best_mean, g_best_std,
+            g_best_fitness, g_best_fitness_boosting_ratio,
+            fes_remaining, sigma
+                                ] 
 
         return self.state
 
     def step(self, action):
-
+        
+        action = action.item()
         # 执行动作，更新环境状态，并返回新的状态、奖励、是否终止以及额外信息
         if action == 0:
             init_vector = MiVD(self.D,self.m,self.global_C,self.best)
@@ -172,7 +196,7 @@ class cmaes(gym.Env):
             sys.stdout = open('/dev/null', 'w')
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                sub_es = cma.CMAEvolutionStrategy(sub_centroid, sigma, {'popsize': self.sub_popsize,'bounds': [self.info['lower'], self.info['upper']]}) 
+                sub_es = cma.CMAEvolutionStrategy(sub_centroid, self.sigma, {'popsize': self.sub_popsize,'bounds': [self.info['lower'], self.info['upper']]}) 
                 sub_es.boundary_handler('BoundPenalty')
             sub_es.C = sub_C #设置初始协方差矩阵
 
@@ -207,8 +231,8 @@ class cmaes(gym.Env):
                 sub_best = sub_es.result[0]
                 sub_best_fitness = sub_es.result[1]
 
-                if sub_best_fitness < best_fitness:
-                    best_fitness = sub_best_fitness
+                if sub_best_fitness < self.best_fitness:
+                    self.best_fitness = sub_best_fitness
                     self.best[init_vector.positions[i]] = sub_best
                 
                 # 将子代的最优解放入 global_Xw
@@ -217,14 +241,50 @@ class cmaes(gym.Env):
                 # 将子代的 C 放入 global_C
                 self.global_C[np.ix_(init_vector.positions[i], init_vector.positions[i])] = sub_es.C
 
-            sigma = sub_es.sigma
+            self.sigma = sub_es.sigma
+        
+        Xw_var = np.std(self.global_Xw)
+        Xw_mean = np.mean(self.global_Xw)
+        Xw_max = np.max(self.global_Xw)
+        Xw_min = np.min(self.global_Xw)
+
+        # 使用 np.corrcoef 计算相关系数矩阵
+        correlation_matrix = np.corrcoef(self.global_C)
+
+        correlation_matrix_max = np.max(correlation_matrix)
+        correlation_matrix_min = np.min(correlation_matrix)
+        correlation_matrix_mean = np.mean(correlation_matrix)
+
+        g_best_max = np.max(self.best)
+        g_best_min = np.min(self.best)
+        g_best_mean = np.mean(self.best)
+        g_best_std = np.std(self.best)
+
+        g_best_fitness = self.best_fitness
+        g_best_fitness_boosting_ratio = 1
+
+        fes_remaining = 3e6 - self.fes
+
+
+        self.done = False
+
+        self.state = [
+            Xw_var, Xw_mean, Xw_max, Xw_min,
+            correlation_matrix_max, correlation_matrix_min, correlation_matrix_mean,
+            g_best_max, g_best_min, g_best_mean, g_best_std,
+            g_best_fitness, g_best_fitness_boosting_ratio,
+            fes_remaining, self.sigma
+                                ] 
         
         # 例如，这里定义一个简单的奖励函数
         reward = self.best_fitness
 
-        self.state = np.zeros(3) #此处还没有设置好
+        if fes_remaining >= 0:
+            self.done = True
+        elif g_best_fitness <= 1e-8:
+            self.done = True
+        else:
+            self.done = False
 
-        self.done = False #此处还没有设置好
-
-        return self.state, reward, self.done, {}
+        return self.state, reward, self.done, {"gbest_val": self.best_fitness, "gbest": self.best}
 

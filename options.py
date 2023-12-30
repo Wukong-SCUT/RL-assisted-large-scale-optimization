@@ -8,12 +8,19 @@ def get_options(args=None):
 
     parser = argparse.ArgumentParser(description="CMAES_PPO")
 
-    # CMAES settings
+    # CMAES(basic_env) settings
     parser.add_argument('--backbone', default='cmaes', choices=['cmaes'], help='backbone algorithm')
-    
+    parser.add_argument('--m', type=int, default=20, help='number of subgroups')
+    parser.add_argument('--sub_popsize', type=int, default=50, help='population size of each subgroup')
+    parser.add_argument('--max_fes', type=int, default=3e6, help='maximum number of function evaluations')
+
     #problem settings
     parser.add_argument('--divide_method', default="train_sep", choices=["random_divide", "train_sep", "train_sep_parsep", "train_sep_parsep_2"], help='method to divide the problem set')
-
+    
+    
+    
+    
+    parser.add_argument('--per_eval_time',  type=int, default=3, help='number of evaluations for each instance')
 
 
 
@@ -57,7 +64,7 @@ def get_options(args=None):
     parser.add_argument('--eps_clip', type=float, default=0.2, help='PPO clip ratio')
     parser.add_argument('--T_train', type=int, default=2000, help='number of iterations for training')
     parser.add_argument('--n_step', type=int, default=10, help='n_step for return estimation')
-    parser.add_argument('--batch_size', type=int, default=16, help='number of instances per batch during training')
+    parser.add_argument('--batch_size', type=int, default=10, help='number of instances per batch during training')
     parser.add_argument('--epoch_end', type=int, default=200, help='maximum training epoch')
     parser.add_argument('--epoch_size', type=int, default=1024, help='number of instances per epoch during training')
     parser.add_argument('--lr_model', type=float, default=1e-5, help="learning rate for the actor network")
