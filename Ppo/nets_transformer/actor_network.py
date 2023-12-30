@@ -3,44 +3,42 @@ import torch
 from Ppo.nets_transformer.graph_layers import MLP_for_actor
 import torch.nn.functional as F
 
-class mySequential(nn.Sequential):
-    def forward(self, *inputs):
-        for module in self._modules.values():
-            if type(inputs) == tuple:
-                inputs = module(*inputs)
-            else:
-                inputs = module(inputs)
-        return inputs
+# class mySequential(nn.Sequential):
+#     def forward(self, *inputs):
+#         for module in self._modules.values():
+#             if type(inputs) == tuple:
+#                 inputs = module(*inputs)
+#             else:
+#                 inputs = module(inputs)
+#         return inputs
 
 
-class MLP(nn.Module): 
-    def __init__(self, config):
-        super(MLP, self).__init__()
-        self.net = nn.Sequential()
-        #self.net_config = config.net_config
-        self.net_config = config
-        for layer_id, layer_config in enumerate(self.net_config):
-            linear = nn.Linear(layer_config['in'], layer_config['out'])
-            self.net.add_module(f'layer{layer_id}-linear', linear)
-            drop_out = nn.Dropout(layer_config['drop_out'])
-            self.net.add_module(f'layer{layer_id}-drop_out', drop_out)
-            if layer_config['activation'] != 'None':
-                activation = eval('nn.'+layer_config['activation'])()
-                self.net.add_module(f'layer{layer_id}-activation', activation)
+# class MLP(nn.Module): 
+#     def __init__(self, config):
+#         super(MLP, self).__init__()
+#         self.net = nn.Sequential()
+#         #self.net_config = config.net_config
+#         self.net_config = config
+#         for layer_id, layer_config in enumerate(self.net_config):
+#             linear = nn.Linear(layer_config['in'], layer_config['out'])
+#             self.net.add_module(f'layer{layer_id}-linear', linear)
+#             drop_out = nn.Dropout(layer_config['drop_out'])
+#             self.net.add_module(f'layer{layer_id}-drop_out', drop_out)
+#             if layer_config['activation'] != 'None':
+#                 activation = eval('nn.'+layer_config['activation'])()
+#                 self.net.add_module(f'layer{layer_id}-activation', activation)
 
-    def forward(self,x):
-        return self.net(x)
+#     def forward(self,x):
+#         return self.net(x)
 
 
 class Actor(nn.Module):
 
-    def __init__(self,
-                 input_dim,
-                 state
-                 ):
+    def __init__(self,state):
         super(Actor, self).__init__()
 
-        self.input_dim = input_dim #和state+1的维度一致
+        self.input_dim = 17 #和state+1的维度一致
+        
         self.state = state
 
         # 网络创建
@@ -65,10 +63,14 @@ class Actor(nn.Module):
         """
         x_in: 放入state
         """
-        x_in = self.state
-        input_tensor = torch.tensor([[0,x_in],[1,x_in],[2,x_in]])
+        x_in_0 = torch.cat((torch.tensor([0]),torch.tensor(self.state)),-1)
+        x_in_1 = torch.cat((torch.tensor([1]),torch.tensor(self.state)),-1)
+        x_in_2 = torch.cat((torch.tensor([2]),torch.tensor(self.state)),-1)
+
+        input_tensor = torch.stack([x_in_0, x_in_1, x_in_2])
 
         score = self.CC_method_net(input_tensor) 
+        print(score)
         action_prob = F.softmax(score, dim=-1) 
         action_dist = torch.distributions.Categorical(action_prob)
 
@@ -86,7 +88,21 @@ class Actor(nn.Module):
 
         return out
     
-    
+
+
+# # 创建一个 Actor 实例
+# actor = Actor(Xw_mean_var=1.0, Xw_mean=2.0, Xw_max=3.0, Xw_min=0.5, Xw_std=0.2,
+#               correlation_matrix_max=0.9, correlation_matrix_min=0.1, correlation_matrix_mean=0.5,
+#               g_best_max=10.0, g_best_min=1.0, g_best_mean=5.0, g_best_std=2.0,
+#               g_best_fitness=100.0, g_best_fitness_boosting_ratio=0.2,
+#               fes_remaining=500, sigma=0.01)
+
+# # 打印模型参数
+# print(actor.get_parameter_number())
+
+# # 使用 forward 方法得到输出
+# output = actor()
+# print(output)
 
 
 # 创建 Actor 模型

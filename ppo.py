@@ -42,7 +42,7 @@ def lr_sd(epoch, opts):
 
 
 class PPO:
-    def __init__(self, opts,vector_env):
+    def __init__(self, opts, vector_env):
 
         # figure out the options
         self.opts = opts
@@ -50,23 +50,29 @@ class PPO:
         self.vector_env=vector_env
         # figure out the actor network
         self.actor = Actor(
-            embedding_dim = opts.embedding_dim,
-            hidden_dim = opts.hidden_dim,
-            n_heads_actor = opts.encoder_head_num,
-            n_heads_decoder = opts.decoder_head_num,
-            n_layers = opts.n_encode_layers,
-            normalization = opts.normalization,
-            v_range = opts.v_range,
-            node_dim=opts.node_dim,
-            hidden_dim1=opts.hidden_dim1_actor,
-            hidden_dim2=opts.hidden_dim2_actor,
-            output_dim=opts.output_dim,
-            no_attn=opts.no_attn,
-            no_eef=opts.no_eef,
-            max_sigma=opts.max_sigma,
-            min_sigma=opts.min_sigma,
+                            opts.Xw_mean_var, # 均值差方差
+                            opts.Xw_mean, # 均值均值
+                            opts.Xw_max, # 均值最大值
+                            opts.Xw_min, # 均值最小值
+                            opts.Xw_std, # 均值标准差
+
+                            opts.correlation_matrix_max, # 相关系数矩阵最大值
+                            opts.correlation_matrix_min, # 相关系数矩阵最小值
+                            opts.correlation_matrix_mean, # 相关系数矩阵均值
+                            
+                            opts.g_best_max, # 全局最优值最大值
+                            opts.g_best_min, # 全局最优值最小值
+                            opts.g_best_mean, # 全局最优值均值
+                            opts.g_best_std, # 全局最优值标准差
+
+                            opts.g_best_fitness, # 全局最优适应度
+                            opts.g_best_fitness_boosting_ratio, # 全局最优适应度提升比例
+
+                            opts.fes_remaining, # 剩余评价次数
+
+                            opts.sigma, # 标准差
         )
-        
+
         if not opts.test:
             # for the sake of ablation study, figure out the input_dim for critic according to setting
             if opts.no_attn and opts.no_eef:
@@ -170,12 +176,14 @@ def train(rank, agent, tb_logger):
 
     # generatate the train_dataset and test_dataset
     set_random_seed(opts.train_dataset_seed)
-    training_dataloader = Make_dataset.train_problem_set( )   
+    Make_dataset=Make_dataset(opts.divide_method)
+
+    training_dataloader = Make_dataset.problem_set("train")   
     if opts.epoch_size==1: 
         test_dataloader=training_dataloader
     else:
         set_random_seed(opts.test_dataset_seed)
-        test_dataloader = Make_dataset.test_problem_set( )
+        test_dataloader = Make_dataset.problem_set("test")
 
 
     best_epoch=None
@@ -221,7 +229,7 @@ def train(rank, agent, tb_logger):
                     disable = opts.no_progress_bar or rank!=0, desc = 'training',
                     bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}')
 
-        for question in enumerate(training_dataloader):
+        for question in range(training_dataloader):
             batch = 10 #此处batch是指每个问题的环境数量
             backbone = cmaes
             # backbone={
@@ -234,6 +242,8 @@ def train(rank, agent, tb_logger):
             env_list=[lambda e=p: backbone(m=opts.m,sub_popsize=opts.sub_popsize,question=question) for p in batch]
             envs=agent.vector_env(env_list)
             # train procedule for a batch
+
+            
 
             batch_step=train_batch(rank,
                                 envs,

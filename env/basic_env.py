@@ -5,6 +5,7 @@ import numpy as np
 import cma
 import warnings
 
+from RL_assist import options as opts
 from cec2013lsgo.cec2013 import Benchmark
 
 # 保存原始的 sys.stdout
@@ -82,12 +83,14 @@ def RD(D,m,C,best):
     return group_best
 
 class cmaes(gym.Env):
-    def __init__(self, m, sub_popsize,question):
+    def __init__(self, opts.m, opts.sub_popsize, question):
         super(cmaes, self).__init__() 
         bench = Benchmark()
 
-        self.m = m
-        self.sub_popsize = sub_popsize
+        question = question
+        self.m = opts.m
+        self.sub_popsize = opts.sub_popsize
+
         self.info = bench.get_info(question)
         self.D = self.info["dimension"]
         self.ub = self.info['upper']
@@ -100,8 +103,17 @@ class cmaes(gym.Env):
 
         self.action_space = spaces.Discrete(3)
 
+        Xw_mean_var=1.0, 
+        Xw_mean=2.0, 
+        Xw_max=3.0, 
+        Xw_min=0.5, 
+        Xw_std=0.2,
+              correlation_matrix_max=0.9, correlation_matrix_min=0.1, correlation_matrix_mean=0.5,
+              g_best_max=10.0, g_best_min=1.0, g_best_mean=5.0, g_best_std=2.0,
+              g_best_fitness=100.0, g_best_fitness_boosting_ratio=0.2,
+              fes_remaining=500, sigma=0.01
         # 初始化环境的内部状态等
-        self.state = np.zeros(3)
+        self.state = 
         self.done = False
 
     def problem(self,x):

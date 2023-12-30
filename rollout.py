@@ -27,7 +27,7 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
     
     # set the same random seed before rollout for the sake of fairness
     set_random_seed(42)
-    for bat_id,batch in enumerate(dataloader):
+    for batch in range(len(dataloader)):
         # figure out the backbone algorithm
         # backbone={
         #     'PSO':GPSO_numpy,

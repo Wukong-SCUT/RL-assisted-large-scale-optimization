@@ -11,6 +11,8 @@ def get_options(args=None):
     # CMAES settings
     parser.add_argument('--backbone', default='cmaes', choices=['cmaes'], help='backbone algorithm')
     
+    #problem settings
+    parser.add_argument('--divide_method', default="train_sep", choices=["random_divide", "train_sep", "train_sep_parsep", "train_sep_parsep_2"], help='method to divide the problem set')
 
 
 
