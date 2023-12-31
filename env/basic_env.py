@@ -4,6 +4,8 @@ import sys
 import numpy as np
 import cma
 import warnings
+from tqdm import tqdm
+import random
 
 #from RL_assist import options as opts
 from cec2013lsgo.cec2013 import Benchmark
@@ -111,7 +113,7 @@ class cmaes(gym.Env):
         self.done = False
 
     def problem(self,x):
-        self.fes += self.sub_popsize
+        self.fes += 1
         x = np.ascontiguousarray(x)
         return self.fun_fitness(x)
 
@@ -171,7 +173,7 @@ class cmaes(gym.Env):
 
     def step(self, action):
         
-        action = action.item()
+        #action = action.item()
         # 执行动作，更新环境状态，并返回新的状态、奖励、是否终止以及额外信息
         if action == 0:
             init_vector = MiVD(self.D,self.m,self.global_C,self.best)
@@ -281,10 +283,23 @@ class cmaes(gym.Env):
 
         if fes_remaining >= 0:
             self.done = True
-        elif g_best_fitness <= 1e-8:
+        elif g_best_fitness >= 1e-8:
             self.done = True
         else:
             self.done = False
 
-        return self.state, reward, self.done, {"gbest_val": self.best_fitness, "gbest": self.best}
+        return self.state, reward, self.done, {"gbest_val": self.best_fitness}
+    
+#测试例子
+if __name__ == '__main__':
+    env = cmaes(question=1)
+    env.reset()
+    for i in tqdm(range(300)):
+        warnings.simplefilter("ignore")
+        env.step(random.choice([0, 1, 2]))
+        if i == 1:
+            sys.stdout = original_stdout
+            print(env.best_fitness)
+    sys.stdout = original_stdout
+    print(env.best_fitness)
 

@@ -17,10 +17,10 @@ def get_options(args=None):
     #problem settings
     parser.add_argument('--divide_method', default="train_sep", choices=["random_divide", "train_sep", "train_sep_parsep", "train_sep_parsep_2"], help='method to divide the problem set')
     
-    
-    
-    
-    parser.add_argument('--per_eval_time',  type=int, default=3, help='number of evaluations for each instance')
+    #rollout settings
+    parser.add_argument('--fes_one_cmaes', type=int, default=10000, help='number of function evaluations for each cmaes')
+    parser.add_argument('--one_problem_batch_size', type=int, default=3, help='number of instances for each problem')
+    parser.add_argument('--per_eval_time',  type=int, default=1, help='number of evaluations for each instance')
 
 
 

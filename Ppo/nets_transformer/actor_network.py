@@ -51,7 +51,7 @@ class Actor(nn.Module):
         # self.MaVD_net = MLP_for_actor(self.input_dim, 16, 1)
         # self.RD_net = MLP_for_actor(self.input_dim, 16, 1)
 
-        print(self.get_parameter_number()) #打印模型参数
+        #print(self.get_parameter_number()) #打印模型参数
 
     def get_parameter_number(self):
         
@@ -70,7 +70,7 @@ class Actor(nn.Module):
         input_tensor = torch.stack([x_in_0, x_in_1, x_in_2])
 
         score = self.CC_method_net(input_tensor) 
-        print(score)
+        #print(score)
         action_prob = F.softmax(score, dim=-1) 
         action_dist = torch.distributions.Categorical(action_prob)
 
