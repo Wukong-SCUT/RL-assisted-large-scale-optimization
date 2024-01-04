@@ -34,15 +34,14 @@ import torch.nn.functional as F
 
 class Actor(nn.Module):
 
-    def __init__(self,state):
+    def __init__(self):
         super(Actor, self).__init__()
 
         self.input_dim = 16 #和state+1的维度一致
         
-        self.state = state
 
         # 网络创建
-        self.CC_method_net = MLP_for_actor(self.input_dim, 16, 1)
+        self.CC_method_net = MLP_for_actor(self.input_dim, 1, 1)
 
         # input  : [CC_method_num, state_1, state_2,..., state_n]
         # output : pobability in the state
@@ -59,25 +58,27 @@ class Actor(nn.Module):
         trainable_num = sum(p.numel() for p in self.parameters() if p.requires_grad)
         return {'Actor: Total': total_num, 'Trainable': trainable_num}
 
-    def forward(self, fixed_action = None):
+    def forward(self, state):
         """
         x_in: 放入state
         """
-        x_in_0 = torch.cat((torch.tensor([0]),torch.tensor(self.state)),-1)
-        x_in_1 = torch.cat((torch.tensor([1]),torch.tensor(self.state)),-1)
-        x_in_2 = torch.cat((torch.tensor([2]),torch.tensor(self.state)),-1)
+        self.state = state
+        
+        x_in_0 = torch.cat((torch.tensor([0], device='cpu') ,torch.tensor(self.state, device='cpu')),-1)
+        x_in_1 = torch.cat((torch.tensor([1], device='cpu') ,torch.tensor(self.state, device='cpu')),-1)
+        x_in_2 = torch.cat((torch.tensor([2], device='cpu') ,torch.tensor(self.state, device='cpu')),-1)
 
         input_tensor = torch.stack([x_in_0, x_in_1, x_in_2])
 
-        score = self.CC_method_net(input_tensor) 
+        score = self.CC_method_net(input_tensor.to('cpu')) 
         #print(score)
         action_prob = F.softmax(score, dim=-1) 
         action_dist = torch.distributions.Categorical(action_prob)
 
-        if fixed_action is not None:
-            action = torch.tensor(fixed_action)
-        else:
-            action = action_dist.sample()
+        # if fixed_action is not None:
+        #     action = torch.tensor(fixed_action)
+        # else:
+        action = action_dist.sample()
         
         log_prob = action_dist.log_prob(action)
 

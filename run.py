@@ -11,7 +11,7 @@ from tensorboard_logger import Logger as TbLogger
 import env
 from env.basic_env import cmaes
 from options import get_options
-from problems.cec_dataset import *
+#from problems.cec_dataset import *
 
 from Ppo.utils.make_dataset import Make_dataset
 from Ppo.utils.logger import log_to_tb_val_per_step
@@ -52,10 +52,10 @@ def run(opts):
             json.dump(vars(opts), f, indent=True)
 
     # Set the device
-    opts.device = torch.device("cuda" if opts.use_cuda else "cpu")
+    opts.device = torch.device("cuda" if opts.use_cuda else "cpu") #注意此处，默认的是gpu
 
     # Figure out the RL algorithm
-    agent = load_agent(opts.RL_agent)(opts)
+    agent = load_agent(opts.RL_agent)(opts) #此处的agent是ppo
 
     # Load data from load_path
     assert opts.load_path is None or opts.resume is None, "Only one of load path and resume can be given"

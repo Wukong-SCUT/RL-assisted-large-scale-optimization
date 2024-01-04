@@ -29,10 +29,10 @@ class Make_dataset:
             return test_problem_set
     
     
-#测试
-Make_dataset = Make_dataset("train_sep_parsep_2")
-print(Make_dataset.problem_set("train"))
-print(Make_dataset.problem_set("test"))
+# #测试
+# Make_dataset = Make_dataset("train_sep_parsep_2")
+# print(Make_dataset.problem_set("train"))
+# print(Make_dataset.problem_set("test"))
 
 # for i in range(len(Make_dataset.train_problem_set())):
 #     print(1)

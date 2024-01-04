@@ -20,12 +20,12 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
         rollout_name='PPO-'+rollout_name
         agent.eval() 
     
-    T = (opts.max_fes // opts.fes_one_cmaes) #3e6/10000=300 cc-cmaes 要迭代的次数
+    T =(opts.max_fes // opts.fes_one_cmaes) / 300 #3e6/10000=300 cc-cmaes 要迭代的次数
 
     # to store the whole rollout process
     batch_size = len(dataloader)*opts.one_problem_batch_size
 
-    cost_rollout=np.zeros((batch_size,int(T)))
+    cost_rollout=np.zeros((int(T),batch_size))
     
     time_eval=0
     collect_mean=[]
@@ -68,9 +68,9 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
         action_test = []
         for _ in range(batch_size):
             state_i = state[_]
-            state_i = state_i.astype(np.float32)
-            actor = Actor(state_i)
-            action,_,_ = actor.forward()
+            #state_i = state_i.astype(np.float32)
+            actor = Actor()
+            action,_,_ = actor.forward(state_i)
             action_test.append(action)
 
         # if agent:
@@ -91,8 +91,8 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
             
         # store the rollout cost history
         for tt in range(batch_size):
-            cost_rollout[tt,t]+=info[tt]['gbest_val']
-            if tt == batch_size:
+            cost_rollout[t,tt]+=info[tt]['gbest_val']
+            if tt == batch_size-1:
                 collect_gbest = cost_rollout[-1,:]
         # if is_end.all():
         #     if t+1<T:
@@ -122,9 +122,12 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
     # np.save(saving_path,save_dict)
 
     # log to tensorboard if needed
-    if tb_logger:
-        log_to_tb_val(tb_logger,cost_rollout,epoch_id)
+
+    #注意注意，此处注释掉了
+    # if tb_logger:
+    #     log_to_tb_val(tb_logger,cost_rollout,epoch_id)
     
+    collect_gbest
     # 将数组按照每3个一组分割
     groups = np.array_split(collect_gbest, len(collect_gbest) // opts.one_problem_batch_size)
 
@@ -138,8 +141,8 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
     return collect_gbest_mean , collect_gbest_std
 
 #测试
-dataloader = [1,2]
-from options import get_options
-opts = get_options()
-input1,input2 =rollout(dataloader,opts)
-print(input1,input2)
+# dataloader = [1,2,3]
+# from options import get_options
+# opts = get_options()
+# input1,input2 =rollout(dataloader,opts)
+# print(input1,input2)

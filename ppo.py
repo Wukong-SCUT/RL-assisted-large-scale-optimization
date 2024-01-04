@@ -12,12 +12,13 @@ from Ppo.nets_transformer.actor_network import Actor
 from Ppo.nets_transformer.critic_network import Critic
 from Ppo.utils.utils import torch_load_cpu, get_inner_model
 from Ppo.utils.logger import log_to_tb_train, log_to_tb_val
+from env.venvs import SubprocVectorEnv
 # import copy
 #from problems.gpso_np import GPSO_numpy
 #from problems.dmspso import DMS_PSO_np
 #from problems.de_np import DE_np
 #from problems.madde import MadDE
-from Ppo.utils.make_dataset import Make_dataset
+from Ppo.utils.make_dataset import Make_dataset 
 from rollout import rollout
 from env.basic_env import cmaes
 
@@ -42,31 +43,20 @@ def lr_sd(epoch, opts):
 
 
 class PPO:
-    def __init__(self, opts, vector_env):
+    def __init__(self, opts):
 
         # figure out the options
         self.opts = opts
         # the parallel environment
-        self.vector_env=vector_env
+        self.vector_env=SubprocVectorEnv
         # figure out the actor network
-        self.actor = Actor(opts.state)
+        self.actor = Actor()
 
         if not opts.test:
-            # for the sake of ablation study, figure out the input_dim for critic according to setting
-            if opts.no_attn and opts.no_eef:
-                input_critic=opts.node_dim
-            elif opts.no_attn and not opts.no_eef:
-                input_critic=3*opts.node_dim
-            elif opts.no_eef and not opts.no_attn:
-                input_critic=opts.node_dim
-            else:
-                # GLEET(default) setting, share the attention machanism between actor and critic
-                input_critic=opts.embedding_dim
             # figure out the critic network
             self.critic = Critic(
-                input_dim = input_critic,
-                hidden_dim1 = opts.hidden_dim1_critic,
-                hidden_dim2 = opts.hidden_dim2_critic,
+                embedding_dim=  opts.batch_size,
+                hidden_dim = opts.batch_size,
             )
             # figure out the optimizer
             self.optimizer = torch.optim.Adam(
@@ -77,7 +67,7 @@ class PPO:
 
         if opts.use_cuda:
             # move to cuda
-            self.actor.to(opts.device)
+            self.actor.to(opts.device) #此处将actor放入cuda:0
             if not opts.test:
                 self.critic.to(opts.device)
 
@@ -149,19 +139,19 @@ def train(rank, agent, tb_logger):
     for state in agent.optimizer.state.values():
         for k, v in state.items():
             if torch.is_tensor(v):
-                state[k] = v.to(opts.device)
+                state[k] = v.to(opts.device) 
 
 
     # generatate the train_dataset and test_dataset
-    set_random_seed(opts.train_dataset_seed)
-    Make_dataset=Make_dataset(opts.divide_method)
+    set_random_seed(42)
+    make_dataset = Make_dataset(opts.divide_method)
 
-    training_dataloader = Make_dataset.problem_set("train")   
+    training_dataloader = make_dataset.problem_set("train")   
     if opts.epoch_size==1: 
         test_dataloader=training_dataloader
     else:
-        set_random_seed(opts.test_dataset_seed)
-        test_dataloader = Make_dataset.problem_set("test")
+        set_random_seed(42)
+        test_dataloader = make_dataset.problem_set("test")
 
 
     best_epoch=None
@@ -180,8 +170,10 @@ def train(rank, agent, tb_logger):
     stop_training=False
 
     # rollout in the 0 epoch model to get the baseline data
-    init_avg_best,init_sigma,baseline=rollout(test_dataloader,opts,agent,tb_logger,-1)
-
+    # init_avg_best,baseline=rollout(test_dataloader,opts,agent,tb_logger,-1)
+    baseline = np.array([2.92242934e+12, 3.01869040e+16, 2.19217652e+13, 5.19558640e+13,
+       3.21623644e+12, 6.26348550e+16, 1.83685347e+13, 5.05585378e+13,
+       2.92320559e+12, 6.34554712e+16, 6.20060268e+14, 7.58340799e+13])
     # Start the actual training loop
     for epoch in range(opts.epoch_start, opts.epoch_end):
         # Training mode
@@ -207,8 +199,8 @@ def train(rank, agent, tb_logger):
                     disable = opts.no_progress_bar or rank!=0, desc = 'training',
                     bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}')
 
-        for question in range(training_dataloader):
-            batch = 10 #此处batch是指每个问题的环境数量
+        for question in training_dataloader:
+            batch = opts.batch_size  #此处batch是指每个问题的环境数量
             backbone = cmaes
             # backbone={
             #     'PSO':GPSO_numpy,
@@ -217,7 +209,7 @@ def train(rank, agent, tb_logger):
             #     'madde':MadDE
             # }.get(opts.backbone,None)
             assert backbone is not None,'Backbone algorithm is currently not supported'
-            env_list=[lambda e=p: backbone(m=opts.m,sub_popsize=opts.sub_popsize,question=question) for p in batch]
+            env_list=[lambda e=p: backbone(question=question) for p in range(batch)]
             envs=agent.vector_env(env_list)
             # train procedule for a batch
 
@@ -268,8 +260,8 @@ def train(rank, agent, tb_logger):
         print('current_epoch:{}, best_epoch:{}'.format(epoch,best_epoch))
         print('best_epoch_list:{}'.format(best_epoch_list))
         print(f'outperform_ratio_list:{outperform_ratio_list}')
-        print(f'init_mean_performance:{init_avg_best}')
-        print(f'init_sigma:{init_sigma}')
+        #print(f'init_mean_performance:{init_avg_best}')
+        #print(f'init_sigma:{init_sigma}')
         print(f'cur_mean_performance:{mean_per_list}')
         print(f'cur_sigma_performance:{sigma_per_list}')
         print(f'cur_outperform_ratio:{outperform_ratio}')
@@ -283,15 +275,15 @@ def train(rank, agent, tb_logger):
 
 
 def train_batch(
-        rank,
-        problem,
-        agent,
+        rank, #这里的rank不知道是什么
+        problem, #这里是basic_env
+        agent, #这里是ppo
         epoch,
         pre_step,
         batch,
         tb_logger,
         opts,
-        pbar,
+        pbar, #这是一个进度条
         batch_id):
     
     # setup
@@ -329,14 +321,26 @@ def train_batch(
         while t - t_s < n_step :  
             
             memory.states.append(state.clone())
-            action, log_lh, entro_p = agent.actor(state) #action，log_lh, entro_p ,去掉to
+
+            action_all = []
+            log_lh_all = []
+            entro_p_all = []
+            for _ in range(batch):
+                state_i = state[_]
+                action,log_lh,entro_p = agent.actor.forward(state_i)
+                action_all.append(action)
+                log_lh_all.append(log_lh)
+                entro_p_all.append(entro_p)
+            action = action_all
+            log_lh = log_lh_all
+            entro_p = entro_p_all
             
 
-            memory.actions.append(action.clone())
+            memory.actions.append(action.copy())
             memory.logprobs.append(log_lh)
-            action=action.cpu().numpy()
+            #action=action.cpu().numpy()
 
-            entropy.append(entro_p.detach().cpu())
+            entropy.append(entro_p) #entro_p.detach().cpu()
 
             baseline_val_detached, baseline_val = agent.critic(state) #直接把state放入即可
             bl_val_detached.append(baseline_val_detached)
@@ -367,17 +371,17 @@ def train_batch(
 
         # begin update
         # 如果是madde这里的action就不能直接stack
-        old_actions = torch.stack(memory.actions)
+        old_actions = memory.actions
         old_states = torch.stack(memory.states).detach() #.view(t_time, bs, ps, dim_f)
         # old_actions = all_actions.view(t_time, bs, ps, -1)
         # print('old_actions.shape:{}'.format(old_actions.shape))
-        old_logprobs = torch.stack(memory.logprobs).detach().view(-1)
+        old_logprobs = torch.tensor(memory.logprobs).detach().view(-1)
 
         # Optimize PPO policy for K mini-epochs:
         old_value = None
         for _k in range(K_epochs):
             if _k == 0:
-                logprobs = memory.logprobs
+                logprobs = torch.tensor(memory.logprobs)
 
             else:
                 # Evaluating old actions and values :
@@ -401,8 +405,8 @@ def train_batch(
                     bl_val_detached.append(baseline_val_detached)
                     bl_val.append(baseline_val)
 
-            logprobs = torch.stack(logprobs).view(-1)
-            entropy = torch.stack(entropy).view(-1)
+            logprobs = logprobs.view(-1)
+            entropy = torch.tensor(entropy).view(-1)
             bl_val_detached = torch.stack(bl_val_detached).view(-1)
             bl_val = torch.stack(bl_val).view(-1)
 
@@ -411,12 +415,13 @@ def train_batch(
             Reward = []
             reward_reversed = memory.rewards[::-1]
             # get next value
-            R = agent.critic(agent.actor(state,only_critic = True))[0]  #这里only_critic=True，所以actor的输出是critic的输入
+            R = agent.critic(state)  #这里only_critic=True，所以actor的输出是critic的输入
 
+            R = torch.tensor(np.array([r.detach().cpu().numpy() for r in R]))
             # R = agent.critic(x_in)[0]
             critic_output=R.clone()
             for r in range(len(reward_reversed)):
-                R = R * gamma + reward_reversed[r]
+                R = torch.cat((R * gamma , reward_reversed[r]),dim=0)
                 Reward.append(R)
             # clip the target:
             Reward = torch.stack(Reward[::-1], 0)
@@ -424,7 +429,7 @@ def train_batch(
             
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach())
-
+            ratios = torch.cat(( ratios , torch.tensor([1.0,1.0])),dim=0)
             # Finding Surrogate Loss:
             advantages = Reward - bl_val_detached
 
@@ -457,7 +462,8 @@ def train_batch(
 
             # perform gradient descent
             agent.optimizer.step()
-
+            
+            
             # Logging to tensorboard
             if(not opts.no_tb) and rank == 0:
                 if current_step % int(opts.log_step) == 0:

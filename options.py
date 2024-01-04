@@ -22,7 +22,12 @@ def get_options(args=None):
     parser.add_argument('--one_problem_batch_size', type=int, default=3, help='number of instances for each problem')
     parser.add_argument('--per_eval_time',  type=int, default=1, help='number of evaluations for each instance')
 
-
+    #PPO settings
+    parser.add_argument('--state', default=[0.0 for _ in range(15)], help='initial state of actor') 
+    #此处单纯为了创建一个actor实例，数值没有实际意义，此处不用np的目的是run中需要转换为json文件
+    parser.add_argument('--test', type=int, default=0, help='swith to test mode')
+    parser.add_argument('--device', default='cpu', help='device to use for training / testing')
+    parser.add_argument('--batch_size', type=int, default=2, help='number of instances per batch during training')
 
     # DE settings
     parser.add_argument('--problem', default='Schwefel', choices=['Sphere', 'Schwefel', 'Ackley', 'Bent_cigar'])
@@ -64,7 +69,7 @@ def get_options(args=None):
     parser.add_argument('--eps_clip', type=float, default=0.2, help='PPO clip ratio')
     parser.add_argument('--T_train', type=int, default=2000, help='number of iterations for training')
     parser.add_argument('--n_step', type=int, default=10, help='n_step for return estimation')
-    parser.add_argument('--batch_size', type=int, default=10, help='number of instances per batch during training')
+    
     parser.add_argument('--epoch_end', type=int, default=200, help='maximum training epoch')
     parser.add_argument('--epoch_size', type=int, default=1024, help='number of instances per epoch during training')
     parser.add_argument('--lr_model', type=float, default=1e-5, help="learning rate for the actor network")
@@ -113,12 +118,11 @@ def get_options(args=None):
     os.environ['MASTER_ADDR'] = '127.0.0.1'
     os.environ['MASTER_PORT'] = '4869'
     # processing settings
-    opts.use_cuda = torch.cuda.is_available() and not opts.no_cuda
+    opts.use_cuda =  opts.no_cuda #torch.cuda.is_available() and not
     opts.run_name = "{}_{}".format(opts.run_name, time.strftime("%Y%m%dT%H%M%S")) \
         if not opts.resume else opts.resume.split('/')[-2]
     opts.save_dir = os.path.join(
         opts.output_dir,
-        "{}_{}".format(opts.problem, opts.dim),
         opts.run_name
     ) if not opts.no_saving else None
 

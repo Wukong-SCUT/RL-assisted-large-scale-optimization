@@ -7,17 +7,14 @@ class Critic(nn.Module):
     def __init__(self,
                  embedding_dim,
                  hidden_dim,
-                 n_heads,
-                 n_layers,
-                 normalization,
                  ):
 
         super(Critic, self).__init__()
         self.embedding_dim = embedding_dim
         self.hidden_dim = hidden_dim
-        self.n_heads = n_heads
-        self.n_layers = n_layers
-        self.normalization = normalization
+        # self.n_heads = n_heads
+        # self.n_layers = n_layers
+        # self.normalization = normalization
 
         # todo: remove the ValueDecoder and use the MLP directly
         self.value_head = ValueDecoder(input_dim=self.embedding_dim,
