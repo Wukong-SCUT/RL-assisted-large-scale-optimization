@@ -52,12 +52,22 @@ class PPO:
         # figure out the actor network
         self.actor = Actor()
 
+        # make_dataset = Make_dataset(opts.divide_method)
+
+        # self.training_dataloader = make_dataset.problem_set("train")   
+        # if opts.epoch_size==1: 
+        #     self.test_dataloader=self.training_dataloader
+        # else:
+        #     set_random_seed(42)
+        #     self.test_dataloader = make_dataset.problem_set("test")
+        
         if not opts.test:
             # figure out the critic network
+            # 这里有点问题 这个维度的选择似乎是固定的
             self.critic = Critic(
-                embedding_dim=  opts.batch_size,
-                hidden_dim = opts.batch_size,
-            )
+                embedding_dim=  opts.feature_num,
+                hidden_dim = opts.feature_num ,
+            ) 
             # figure out the optimizer
             self.optimizer = torch.optim.Adam(
                 [{'params': self.actor.parameters(), 'lr': opts.lr_model}] +
@@ -153,6 +163,9 @@ def train(rank, agent, tb_logger):
         set_random_seed(42)
         test_dataloader = make_dataset.problem_set("test")
 
+    # training_dataloader=agent.training_dataloader
+    # test_dataloader=agent.test_dataloader
+
 
     best_epoch=None
     best_avg_best_cost=None
@@ -170,12 +183,12 @@ def train(rank, agent, tb_logger):
     stop_training=False
 
     # rollout in the 0 epoch model to get the baseline data
-    # init_avg_best,baseline=rollout(test_dataloader,opts,agent,tb_logger,-1)
+    #init_avg_best,baseline=rollout(test_dataloader,opts,agent,tb_logger,-1)
     baseline = np.array([2.92242934e+12, 3.01869040e+16, 2.19217652e+13, 5.19558640e+13,
        3.21623644e+12, 6.26348550e+16, 1.83685347e+13, 5.05585378e+13,
        2.92320559e+12, 6.34554712e+16, 6.20060268e+14, 7.58340799e+13])
     # Start the actual training loop
-    for epoch in range(opts.epoch_start, opts.epoch_end):
+    for epoch in range(opts.epoch_start, opts.epoch_end): #epoch_start=0,epoch_end=200
         # Training mode
         set_random_seed()
         agent.train() #此处只是将actor和critic的状态都设置为train
@@ -197,41 +210,46 @@ def train(rank, agent, tb_logger):
         # episode_step=8500
         pbar = tqdm(total = (opts.K_epochs) * (opts.epoch_size // opts.batch_size) * (episode_step) ,
                     disable = opts.no_progress_bar or rank!=0, desc = 'training',
-                    bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}')
+                    bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') #这里是不是有点太大了？？ training:   0%|                    | 0/4608000.0 [00:00<?, ?it/s]  4608000？？
 
-        for question in training_dataloader:
-            batch = opts.batch_size  #此处batch是指每个问题的环境数量
-            backbone = cmaes
-            # backbone={
-            #     'PSO':GPSO_numpy,
-            #     'DMSPSO':DMS_PSO_np,
-            #     'DE':DE_np,
-            #     'madde':MadDE
-            # }.get(opts.backbone,None)
-            assert backbone is not None,'Backbone algorithm is currently not supported'
-            env_list=[lambda e=p: backbone(question=question) for p in range(batch)]
-            envs=agent.vector_env(env_list)
-            # train procedule for a batch
+        #for question in training_dataloader:
+        batch = opts.one_problem_batch_size*len(training_dataloader)  
+        backbone = cmaes
+        # backbone={
+        #     'PSO':GPSO_numpy,
+        #     'DMSPSO':DMS_PSO_np,
+        #     'DE':DE_np,
+        #     'madde':MadDE
+        # }.get(opts.backbone,None)
+        assert backbone is not None,'Backbone algorithm is currently not supported'
+        env_list = [lambda e=p,q=question: backbone(q) for p in range(opts.one_problem_batch_size) for question in training_dataloader]
+        
+        #每个问题的环境数量为3，所以总的环境数量为3*问题数量
 
-            
+        #env_list=[lambda e=p: backbone(question=question) for p in range(batch)] 
+        envs=agent.vector_env(env_list)
+        # train procedule for a batch
 
-            batch_step=train_batch(rank,
-                                envs,
-                                agent,
-                                epoch,
-                                pre_step,
-                                batch,
-                                tb_logger,
-                                opts,
-                                pbar,
-                                question)
-            
-            pre_step += batch_step
-            envs.close()
-            # see if the learning step reach the max_learning_step, if so, stop training
-            if pre_step>=opts.max_learning_step:
-                stop_training=True
-                break
+        
+
+        batch_step=train_batch(rank,
+                            envs,
+                            agent,
+                            epoch,
+                            pre_step,
+                            batch,
+                            tb_logger,
+                            opts,
+                            pbar,
+                            batch_id=0
+                            )
+        
+        pre_step += batch_step
+        envs.close()
+        # see if the learning step reach the max_learning_step, if so, stop training
+        if pre_step>=opts.max_learning_step:   #最大学习步骤 乱设了一个10000 因为一开始没有这个参数
+            stop_training=True
+            break
         pbar.close()
 
         # save new model after one epoch
@@ -239,13 +257,15 @@ def train(rank, agent, tb_logger):
             if not opts.no_saving and (( opts.checkpoint_epochs != 0 and epoch % opts.checkpoint_epochs == 0) or \
                                        epoch == opts.epoch_end - 1): agent.save(epoch)
                                        
-        if (epoch-opts.epoch_start) % opts.update_best_model_epochs==0 or epoch == opts.epoch_end-1:
+        if (epoch-opts.epoch_start) % opts.update_best_model_epochs==0 or epoch == opts.epoch_end-1: #update_best_model_epochs 乱设了一个99999 因为一开始没有这个参数
             # validate the new model
-            avg_best,sigma,per_problem_performance=rollout(test_dataloader,opts,agent,tb_logger,epoch)
+            avg_best,per_problem_performance=rollout(test_dataloader,opts,agent,tb_logger,-1)
+            #avg_best,sigma,per_problem_performance=rollout(test_dataloader,opts,agent,tb_logger,epoch)
             outperform_ratio=np.sum(per_problem_performance<baseline)/len(baseline)
-            tb_logger.add_scalar('performance/outperform_ratio',outperform_ratio,epoch)
+            #这里要检查一下
+            #tb_logger.add_scalar('performance/outperform_ratio',outperform_ratio,epoch)
             mean_per_list.append(avg_best)
-            sigma_per_list.append(sigma)
+            #sigma_per_list.append(sigma)
             if epoch==opts.epoch_start:
                 best_avg_best_cost=avg_best
                 best_epoch=epoch
@@ -263,10 +283,10 @@ def train(rank, agent, tb_logger):
         #print(f'init_mean_performance:{init_avg_best}')
         #print(f'init_sigma:{init_sigma}')
         print(f'cur_mean_performance:{mean_per_list}')
-        print(f'cur_sigma_performance:{sigma_per_list}')
+        #print(f'cur_sigma_performance:{sigma_per_list}')
         print(f'cur_outperform_ratio:{outperform_ratio}')
-        print(f'best_rl_pso_mean:{mean_per_list[(best_epoch-opts.epoch_start)  // opts.update_best_model_epochs]}')
-        print(f'best_rl_pso_std:{sigma_per_list[(best_epoch-opts.epoch_start)  // opts.update_best_model_epochs]}')
+        #print(f'best_rl_pso_mean:{mean_per_list[(best_epoch-opts.epoch_start)  // opts.update_best_model_epochs]}')
+        #print(f'best_rl_pso_std:{sigma_per_list[(best_epoch-opts.epoch_start)  // opts.update_best_model_epochs]}')
         
         if stop_training:
             print('Have reached the maximum learning steps')
@@ -276,7 +296,7 @@ def train(rank, agent, tb_logger):
 
 def train_batch(
         rank, #这里的rank不知道是什么
-        problem, #这里是basic_env
+        problem, #这里是vector_env
         agent, #这里是ppo
         epoch,
         pre_step,
@@ -342,6 +362,13 @@ def train_batch(
 
             entropy.append(entro_p) #entro_p.detach().cpu()
 
+            # baseline_val_detached_all = []
+            # baseline_val_all = []
+            # for _ in range(batch):
+            #     state_j = state[_]
+            #     baseline_val_detached, baseline_val = agent.critic(state_j)
+            #     baseline_val_detached_all.append(baseline_val_detached)
+            #     baseline_val_all.append(baseline_val)
             baseline_val_detached, baseline_val = agent.critic(state) #直接把state放入即可
             bl_val_detached.append(baseline_val_detached)
             bl_val.append(baseline_val)
@@ -392,20 +419,20 @@ def train_batch(
 
                 for tt in range(t_time):
 
+                    for i in range(batch):
                     # get new action_prob
-                    _, log_p,  entro_p = agent.actor(old_states[tt],
-                                                     fixed_action = old_actions[tt],
-                                                     )
+                        _, log_p,  entro_p = agent.actor(old_states[tt][i],
+                                                        )
 
-                    logprobs.append(log_p)
-                    entropy.append(entro_p.detach().cpu())
+                        logprobs.append(log_p)
+                        entropy.append(entro_p.detach().cpu())
 
                     baseline_val_detached, baseline_val = agent.critic(state)
 
                     bl_val_detached.append(baseline_val_detached)
                     bl_val.append(baseline_val)
 
-            logprobs = logprobs.view(-1)
+            logprobs = torch.tensor(logprobs).view(-1)
             entropy = torch.tensor(entropy).view(-1)
             bl_val_detached = torch.stack(bl_val_detached).view(-1)
             bl_val = torch.stack(bl_val).view(-1)
@@ -415,13 +442,13 @@ def train_batch(
             Reward = []
             reward_reversed = memory.rewards[::-1]
             # get next value
-            R = agent.critic(state)  #这里only_critic=True，所以actor的输出是critic的输入
+            R ,_ = agent.critic(state)  #这里only_critic=True，所以actor的输出是critic的输入
 
-            R = torch.tensor(np.array([r.detach().cpu().numpy() for r in R]))
+            # R = torch.tensor(np.array([r.detach().cpu().numpy() for r in R])) #这里是元组，没法处理
             # R = agent.critic(x_in)[0]
             critic_output=R.clone()
             for r in range(len(reward_reversed)):
-                R = torch.cat((R * gamma , reward_reversed[r]),dim=0)
+                R = R * gamma + reward_reversed[r]
                 Reward.append(R)
             # clip the target:
             Reward = torch.stack(Reward[::-1], 0)
@@ -429,7 +456,7 @@ def train_batch(
             
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach())
-            ratios = torch.cat(( ratios , torch.tensor([1.0,1.0])),dim=0)
+            #ratios = torch.cat(( ratios , torch.tensor([1.0,1.0])),dim=0)
             # Finding Surrogate Loss:
             advantages = Reward - bl_val_detached
 
@@ -464,11 +491,13 @@ def train_batch(
             agent.optimizer.step()
             
             
-            # Logging to tensorboard
+            #Logging to tensorboard
             if(not opts.no_tb) and rank == 0:
                 if current_step % int(opts.log_step) == 0:
-                    log_to_tb_train(tb_logger, agent, Reward,R,critic_output, ratios, bl_val_detached, total_cost, grad_norms, memory.rewards, entropy, approx_kl_divergence,
-                                    reinforce_loss, baseline_loss, logprobs, opts.show_figs, current_step)
+                    log_to_tb_train(tb_logger, agent, Reward, ratios, bl_val_detached, total_cost, grad_norms, memory.rewards, entropy, approx_kl_divergence,
+                                    reinforce_loss, baseline_loss, logprobs,1e6, np.array([2.92242934e+12, 3.01869040e+16, 2.19217652e+13, 5.19558640e+13,
+       3.21623644e+12, 6.26348550e+16, 1.83685347e+13, 5.05585378e+13,
+       2.92320559e+12, 6.34554712e+16, 6.20060268e+14, 7.58340799e+13]), opts.show_figs, current_step)
 
             if rank == 0: pbar.update(1)
             # end update

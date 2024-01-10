@@ -157,7 +157,7 @@ class ValueDecoder(nn.Module):
 
     def forward(self, h_em):  # h_em: [bs, ps, feature_dim]
         # mean Pooling
-        mean_pooling = h_em.mean(1)  # [bs, feature_dim]
+        mean_pooling = h_em #.mean(1)  # [bs, feature_dim]
         # graph_feature = self.project_graph(mean_pooling)[:, None, :]  # [bs, 1, dim_em]
         # node_feature = self.project_node(h_em)  # [bs, ps, dim_em]
         # fusion = node_feature + graph_feature.expand_as(node_feature)  # [bs, ps, dim_em]

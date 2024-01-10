@@ -141,8 +141,11 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
     return collect_gbest_mean , collect_gbest_std
 
 #测试
-# dataloader = [1,2,3]
-# from options import get_options
-# opts = get_options()
-# input1,input2 =rollout(dataloader,opts)
-# print(input1,input2)
+if __name__ == '__main__':
+    import sys
+    sys.path.append('..')
+    from options import get_options
+    opts = get_options()
+    dataloader = [1,2,3]
+    input1,input2 =rollout(dataloader,opts)
+    print(input1,input2)

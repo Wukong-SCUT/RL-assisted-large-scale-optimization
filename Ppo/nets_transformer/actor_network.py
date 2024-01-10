@@ -62,11 +62,11 @@ class Actor(nn.Module):
         """
         x_in: 放入state
         """
-        self.state = state
+        self.state = torch.tensor(state)
         
-        x_in_0 = torch.cat((torch.tensor([0], device='cpu') ,torch.tensor(self.state, device='cpu')),-1)
-        x_in_1 = torch.cat((torch.tensor([1], device='cpu') ,torch.tensor(self.state, device='cpu')),-1)
-        x_in_2 = torch.cat((torch.tensor([2], device='cpu') ,torch.tensor(self.state, device='cpu')),-1)
+        x_in_0 = torch.cat((torch.tensor([0], device='cpu') ,self.state.to('cpu')),-1)
+        x_in_1 = torch.cat((torch.tensor([1], device='cpu') ,self.state.to('cpu')),-1)
+        x_in_2 = torch.cat((torch.tensor([2], device='cpu') ,self.state.to('cpu')),-1)
 
         input_tensor = torch.stack([x_in_0, x_in_1, x_in_2])
 
@@ -87,7 +87,7 @@ class Actor(nn.Module):
         entropy = action_dist.entropy()  # for logging only
         out = (action,ll,entropy)
 
-        return out
+        return out  #注意此处一开始就是元组
     
 
 

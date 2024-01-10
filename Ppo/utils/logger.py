@@ -1,7 +1,7 @@
 import torch
 import math
 from Ppo.utils.plots import plot_grad_flow, plot_improve_pg
-
+import numpy as np
     
 def log_to_screen(init_value, best_value, reward, search_history,
                   batch_size, dataset_size, T, records):
@@ -61,16 +61,16 @@ def log_to_tb_train(tb_logger, agent, Reward, ratios, bl_val_detached, total_cos
     
     tb_logger.log_value('learnrate_pg/actor_lr', agent.optimizer.param_groups[0]['lr'], mini_step)
     tb_logger.log_value('learnrate_pg/critic_lr', agent.optimizer.param_groups[1]['lr'], mini_step)
-    avg_cost = total_cost.mean().item()
+    avg_cost = total_cost #.mean().item()
     tb_logger.log_value('train/avg_cost', avg_cost, mini_step)
     tb_logger.log_value('train/Target_Return', Reward.mean().item(), mini_step)
     tb_logger.log_value('train/ratios', ratios.mean().item(), mini_step)
-    avg_reward = torch.stack(reward, 0).sum(0).mean().item()
-    max_reward = torch.stack(reward, 0).max(0)[0].mean().item()
+    avg_reward = np.array(reward).mean()#torch.stack(reward, 0).sum(0).mean().item()
+    max_reward = np.array(reward).max()#torch.stack(reward, 0).max(0)[0].mean().item()
     tb_logger.log_value('train/avg_reward', avg_reward, mini_step)
-    tb_logger.log_value('train/init_cost', initial_cost.mean(), mini_step)
+    tb_logger.log_value('train/init_cost', np.array(initial_cost).mean(), mini_step)
     tb_logger.log_value('train/max_reward', max_reward, mini_step)
-    tb_logger.log_value('train/baseline', baseline.mean(), mini_step)
+    tb_logger.log_value('train/baseline', np.array(baseline).mean(), mini_step)
 
     grad_norms, grad_norms_clipped = grad_norms
     tb_logger.log_value('loss/actor_loss', reinforce_loss.item(), mini_step)

@@ -4,6 +4,7 @@ import sys
 import numpy as np
 import cma
 import warnings
+import torch
 from tqdm import tqdm
 import random
 
