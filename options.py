@@ -23,14 +23,26 @@ def get_options(args=None):
     parser.add_argument('--per_eval_time',  type=int, default=1, help='number of evaluations for each instance')
 
     #PPO settings
+    parser.add_argument('--lr_critic', type=float, default=1e-5, help="learning rate for the critic network")
     parser.add_argument('--state', default=[0.0 for _ in range(15)], help='initial state of actor') 
     #此处单纯为了创建一个actor实例，数值没有实际意义，此处不用np的目的是run中需要转换为json文件
     parser.add_argument('--test', type=int, default=0, help='swith to test mode')
-    parser.add_argument('--device', default='cpu', help='device to use for training / testing')
-    parser.add_argument('--batch_size', type=int, default=2, help='number of instances per batch during training')
+    parser.add_argument('--device', default='cuda', choices=['cpu'], help='device to use for training / testing')
+    #parser.add_argument('--batch_size', type=int, default=2, help='number of instances per batch during training')
     parser.add_argument('--feature_num', type=int, default=15, help='number of features of each instance')
     parser.add_argument('--max_learning_step', type=int, default=10000, help='number of iterations for training')
     parser.add_argument('--update_best_model_epochs', type=int, default=99999, help='number of iterations for training')
+
+    #run settings
+    parser.add_argument('--no_tb', action='store_true', help='disable Tensorboard logging')
+    parser.add_argument('--log_dir', default='logs', help='directory to write TensorBoard information to')
+    parser.add_argument('--no_saving', action='store_true', help='disable saving checkpoints')
+    parser.add_argument('--output_dir', default='outputs', help='directory to write output models to')
+    parser.add_argument('--run_name', default='run_name', help='name to identify the run') 
+    parser.add_argument('--RL_agent', default='ppo', choices=['ppo'], help='RL Training algorithm')
+    parser.add_argument('--eval_only', action='store_true', default=False, help='switch to inference mode')
+    parser.add_argument('--seed', type=int, default=1234, help='random seed to use')
+
 
 
 
@@ -49,13 +61,11 @@ def get_options(args=None):
 
     # parameters in framework
     parser.add_argument('--no_cuda', action='store_true', help='disable GPUs')
-    parser.add_argument('--no_tb', action='store_true', help='disable Tensorboard logging')
     parser.add_argument('--show_figs', action='store_true', help='enable figure logging')
-    parser.add_argument('--no_saving', action='store_true', help='disable saving checkpoints')
+    
     parser.add_argument('--use_assert', action='store_true', help='enable assertion')
     parser.add_argument('--no_DDP', action='store_true', help='disable distributed parallel')
-    parser.add_argument('--seed', type=int, default=1234, help='random seed to use')
-
+    
     # Net(Attention Aggregation) parameters
     parser.add_argument('--v_range', type=float, default=6., help='to control the entropy')
     parser.add_argument('--encoder_head_num', type=int, default=4, help='head number of encoder')
@@ -67,7 +77,6 @@ def get_options(args=None):
     parser.add_argument('--normalization', default='layer', help="normalization type, 'layer' (default) or 'batch'")
 
     # Training parameters
-    parser.add_argument('--RL_agent', default='ppo', choices=['ppo'], help='RL Training algorithm')
     parser.add_argument('--gamma', type=float, default=0.999, help='reward discount factor for future rewards')
     parser.add_argument('--decision_interval', type=int, default=1, help='make action decision per decision_interval generations')
     parser.add_argument('--K_epochs', type=int, default=3, help='mini PPO epoch')
@@ -76,15 +85,13 @@ def get_options(args=None):
     parser.add_argument('--n_step', type=int, default=10, help='n_step for return estimation')
     
     parser.add_argument('--epoch_end', type=int, default=200, help='maximum training epoch')
-    parser.add_argument('--epoch_size', type=int, default=1024, help='number of instances per epoch during training')
+    parser.add_argument('--epoch_size', type=int, default=200, help='number of instances per epoch during training')
     parser.add_argument('--lr_model', type=float, default=1e-5, help="learning rate for the actor network")
-    parser.add_argument('--lr_critic', type=float, default=1e-5, help="learning rate for the critic network")
     parser.add_argument('--lr_decay', type=float, default=1., help='learning rate decay per epoch')
     parser.add_argument('--max_grad_norm', type=float, default=0.1, help='maximum L2 norm for gradient clipping')
 
     # Inference and validation parameters
     parser.add_argument('--Max_Eval', type=int, default=200000, help='number of obj evaluation for inference')
-    parser.add_argument('--eval_only', action='store_true', default=False, help='switch to inference mode')
     parser.add_argument('--val_size', type=int, default=1024, help='number of instances for validation/inference')
     parser.add_argument('--greedy_rollout', action='store_true')
     parser.add_argument('--dataset_path', default=None,)
@@ -107,10 +114,8 @@ def get_options(args=None):
 
     # logs/output settings
     parser.add_argument('--no_progress_bar', action='store_true', help='disable progress bar')
-    parser.add_argument('--log_dir', default='logs', help='directory to write TensorBoard information to')
+    
     parser.add_argument('--log_step', type=int, default=1, help='log info every log_step gradient steps')
-    parser.add_argument('--output_dir', default='outputs', help='directory to write output models to')
-    parser.add_argument('--run_name', default='run_name', help='name to identify the run')
     parser.add_argument('--checkpoint_epochs', type=int, default=1, help='save checkpoint every n epochs (default 1), 0 to save no checkpoints')
 
     opts = parser.parse_args(args)
@@ -123,7 +128,7 @@ def get_options(args=None):
     os.environ['MASTER_ADDR'] = '127.0.0.1'
     os.environ['MASTER_PORT'] = '4869'
     # processing settings
-    opts.use_cuda =  opts.no_cuda #torch.cuda.is_available() and not
+    opts.use_cuda =  1 #opts.no_cuda #torch.cuda.is_available() and not
     opts.run_name = "{}_{}".format(opts.run_name, time.strftime("%Y%m%dT%H%M%S")) \
         if not opts.resume else opts.resume.split('/')[-2]
     opts.save_dir = os.path.join(

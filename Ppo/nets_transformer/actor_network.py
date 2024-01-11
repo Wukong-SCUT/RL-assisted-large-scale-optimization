@@ -37,7 +37,7 @@ class Actor(nn.Module):
     def __init__(self):
         super(Actor, self).__init__()
 
-        self.input_dim = 16 #和state+1的维度一致
+        self.input_dim = 16 #和state+1的维度一致 这里实际上扩展性不好
         
 
         # 网络创建
@@ -64,13 +64,13 @@ class Actor(nn.Module):
         """
         self.state = torch.tensor(state)
         
-        x_in_0 = torch.cat((torch.tensor([0], device='cpu') ,self.state.to('cpu')),-1)
-        x_in_1 = torch.cat((torch.tensor([1], device='cpu') ,self.state.to('cpu')),-1)
-        x_in_2 = torch.cat((torch.tensor([2], device='cpu') ,self.state.to('cpu')),-1)
+        x_in_0 = torch.cat((torch.tensor([0], device='cuda') ,self.state),-1)
+        x_in_1 = torch.cat((torch.tensor([1], device='cuda') ,self.state),-1)
+        x_in_2 = torch.cat((torch.tensor([2], device='cuda') ,self.state),-1)
 
         input_tensor = torch.stack([x_in_0, x_in_1, x_in_2])
 
-        score = self.CC_method_net(input_tensor.to('cpu')) 
+        score = self.CC_method_net(input_tensor.to('cuda')) 
         #print(score)
         action_prob = F.softmax(score, dim=-1) 
         action_dist = torch.distributions.Categorical(action_prob)
@@ -92,17 +92,22 @@ class Actor(nn.Module):
 
 
 # # 创建一个 Actor 实例
-# actor = Actor(state=[1.0, 2.0, 3.0, 0.5, 0.2,
-#               0.9, 0.1, 0.5,
-#               10.0, 1.0, 5.0, 2.0,
-#               100.0, 0.2,
-#               500, 0.01 ])
+# actor = Actor()
 
 # # 打印模型参数
 # print(actor.get_parameter_number())
 
 # # 使用 forward 方法得到输出
-# output = actor()
+# output = actor(state=[[1.0, 2.0, 3.0, 0.5, 0.2,
+#               0.9, 0.1, 0.5,
+#               10.0, 1.0, 5.0, 2.0,
+#               100.0, 0.2,
+#               500, 0.01 ],[1.0, 2.0, 3.0, 0.5, 0.2,
+#               0.9, 0.1, 0.5,
+#               10.0, 1.0, 5.0, 2.0,
+#               100.0, 0.2,
+#               500, 0.01 ]])
+
 # action,_,_ = actor()
 # print(output)
 # print(action.item())

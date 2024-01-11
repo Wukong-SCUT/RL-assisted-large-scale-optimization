@@ -11,7 +11,7 @@ from tensorboard_logger import Logger as TbLogger
 import env
 from env.basic_env import cmaes
 from options import get_options
-#from problems.cec_dataset import *
+
 
 from Ppo.utils.make_dataset import Make_dataset
 from Ppo.utils.logger import log_to_tb_val_per_step
@@ -26,20 +26,16 @@ def load_agent(name):
     return agent
 
 
-def run(opts):
+def run(opts): 
 
     # Pretty print the run args
-    pprint.pprint(vars(opts))
+    pprint.pprint(vars(opts)) #更有结构的方式（pprint.pprint)呈现opts的参数设置
 
-    # Set the random seed
-    # torch.manual_seed(opts.seed)
-    # np.random.seed(opts.seed)
-
-    # Optionally configure tensorboard
+    # Optionally configure tensorboard  #注册tb_logger
     tb_logger = None
-    if not opts.no_tb and not opts.distributed:
+    if not opts.no_tb and not opts.distributed: #如果不是分布式的，就用tensorboard
         tb_logger = TbLogger(os.path.join(opts.log_dir,
-                                          "{}_{}".format(opts.problem, opts.dim),
+                                          "{}".format(opts.divide_method),
                                           'debug',
                                           opts.run_name))
 
@@ -66,7 +62,7 @@ def run(opts):
     # Do validation only
     if opts.eval_only:
         # Load the validation datasets
-        agent.start_inference(tb_logger)
+        agent.start_inference(tb_logger) #这段没什么用，agent.start_inference(tb_logger)不存在
         
     else:
         if opts.resume:
@@ -158,6 +154,6 @@ if __name__ == "__main__":
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     
-    run(get_options()) # 从options.py中获取参数
+    run(get_options()) # 从options.py中获取参数 进入run函数
 
     # test(get_options())

@@ -51,21 +51,12 @@ class PPO:
         self.vector_env=SubprocVectorEnv
         # figure out the actor network
         self.actor = Actor()
-
-        # make_dataset = Make_dataset(opts.divide_method)
-
-        # self.training_dataloader = make_dataset.problem_set("train")   
-        # if opts.epoch_size==1: 
-        #     self.test_dataloader=self.training_dataloader
-        # else:
-        #     set_random_seed(42)
-        #     self.test_dataloader = make_dataset.problem_set("test")
         
-        if not opts.test:
+        if not opts.test: #test的时候是不会执行的
             # figure out the critic network
             # 这里有点问题 这个维度的选择似乎是固定的
             self.critic = Critic(
-                embedding_dim=  opts.feature_num,
+                embedding_dim=  opts.feature_num, #和state的大小一样，为15
                 hidden_dim = opts.feature_num ,
             ) 
             # figure out the optimizer
@@ -75,11 +66,11 @@ class PPO:
             # figure out the lr schedule
             self.lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optimizer, opts.lr_decay, last_epoch=-1,)
 
-        if opts.use_cuda:
+        if opts.use_cuda: #将除了basic_env之外的所有东西都放入cuda:0
             # move to cuda
             self.actor.to(opts.device) #此处将actor放入cuda:0
             if not opts.test:
-                self.critic.to(opts.device)
+                self.critic.to(opts.device) 
 
 
     # load model from load_path
@@ -136,7 +127,7 @@ class PPO:
         train(0, self, tb_logger)
 
 # inference for training
-def train(rank, agent, tb_logger):  
+def train(rank, agent, tb_logger):  #这里agent就是ppo
     print("begin training")
     opts = agent.opts
     warnings.filterwarnings("ignore")
@@ -146,7 +137,7 @@ def train(rank, agent, tb_logger):
     np.random.seed(opts.seed)
 
     # move optimizer's data onto chosen device
-    for state in agent.optimizer.state.values():
+    for state in agent.optimizer.state.values(): #Adam
         for k, v in state.items():
             if torch.is_tensor(v):
                 state[k] = v.to(opts.device) 
@@ -182,8 +173,9 @@ def train(rank, agent, tb_logger):
 
     stop_training=False
 
+    # 此处为了节约时间先设置关闭rollout
     # rollout in the 0 epoch model to get the baseline data
-    #init_avg_best,baseline=rollout(test_dataloader,opts,agent,tb_logger,-1)
+    # init_avg_best,baseline=rollout(test_dataloader,opts,agent,tb_logger,-1)
     baseline = np.array([2.92242934e+12, 3.01869040e+16, 2.19217652e+13, 5.19558640e+13,
        3.21623644e+12, 6.26348550e+16, 1.83685347e+13, 5.05585378e+13,
        2.92320559e+12, 6.34554712e+16, 6.20060268e+14, 7.58340799e+13])
@@ -205,10 +197,10 @@ def train(rank, agent, tb_logger):
                                                                                      agent.optimizer.param_groups[1]['lr'], opts.run_name) , flush=True)
 
         # start training
-        step = epoch * (opts.epoch_size // opts.batch_size)
-        episode_step=(opts.max_fes // opts.population_size) // opts.n_step
+        # step = epoch * (opts.epoch_size // opts.batch_size)
+        episode_step = opts.max_fes // opts.fes_one_cmaes #max_fes=3e6,fes_one_cmaes=10000 
         # episode_step=8500
-        pbar = tqdm(total = (opts.K_epochs) * (opts.epoch_size // opts.batch_size) * (episode_step) ,
+        pbar = tqdm(total = (opts.K_epochs) * opts.epoch_size  * (episode_step) ,
                     disable = opts.no_progress_bar or rank!=0, desc = 'training',
                     bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') #这里是不是有点太大了？？ training:   0%|                    | 0/4608000.0 [00:00<?, ?it/s]  4608000？？
 
@@ -227,21 +219,17 @@ def train(rank, agent, tb_logger):
         #每个问题的环境数量为3，所以总的环境数量为3*问题数量
 
         #env_list=[lambda e=p: backbone(question=question) for p in range(batch)] 
-        envs=agent.vector_env(env_list)
+        envs=agent.vector_env(env_list) #创建并行环境
         # train procedule for a batch
 
-        
-
         batch_step=train_batch(rank,
-                            envs,
-                            agent,
-                            epoch,
-                            pre_step,
-                            batch,
-                            tb_logger,
+                            envs, #这里是vector_env
+                            agent,  #这里是ppo
+                            pre_step,   #这里是pre_step 开始传入的是0
+                            batch,  #这里是batch
+                            tb_logger,  #这里是tb_logger
                             opts,
-                            pbar,
-                            batch_id=0
+                            pbar,   #进程表
                             )
         
         pre_step += batch_step
@@ -296,31 +284,29 @@ def train(rank, agent, tb_logger):
 
 def train_batch(
         rank, #这里的rank不知道是什么
-        problem, #这里是vector_env
+        vector_env, #这里是vector_env
         agent, #这里是ppo
-        epoch,
-        pre_step,
+        pre_step, #这里是pre_step 开始传入的是0
         batch,
         tb_logger,
         opts,
         pbar, #这是一个进度条
-        batch_id):
+        ):
     
     # setup
-    agent.train()
+    agent.train() #切换为训练模型
     memory = Memory()
 
-    population_size = opts.population_size
-
     # initial instances and solutions
-    state=problem.reset()
-    state=torch.FloatTensor(state).to(opts.device)
+    state=vector_env.reset() 
+    state=torch.FloatTensor(state).to(opts.device) #将state放入cuda:0
     state=torch.where(torch.isnan(state),torch.zeros_like(state),state)
-    
+    # 对于输入张量 state 中的每个元素，
+    # 如果该元素是 NaN（Not a Number），则将其替换为 0；否则，保持不变
 
     # params for training
     gamma = opts.gamma
-    n_step = opts.n_step
+    n_step = opts.n_step #使用多少个时间步来计算回报，这里设置为10
     
     K_epochs = opts.K_epochs
     eps_clip = opts.eps_clip
@@ -329,7 +315,7 @@ def train_batch(
     # initial_cost = obj
     done=False
     
-    # sample trajectory
+    # sample trajectory # 轨迹抽样
     while not done:
         t_s = t
         total_cost = 0
@@ -342,16 +328,21 @@ def train_batch(
             
             memory.states.append(state.clone())
 
+            #这里有点问题，这个actor需要再检查
             action_all = []
+            action_all_cpu = []
             log_lh_all = []
             entro_p_all = []
             for _ in range(batch):
                 state_i = state[_]
                 action,log_lh,entro_p = agent.actor.forward(state_i)
                 action_all.append(action)
+                action_all_cpu.append(action.detach().cpu())
                 log_lh_all.append(log_lh)
                 entro_p_all.append(entro_p)
-            action = action_all
+            
+            action = action_all #这里action转入了cpu
+            action_cpu = action_all_cpu
             log_lh = log_lh_all
             entro_p = entro_p_all
             
@@ -375,7 +366,7 @@ def train_batch(
 
 
             # state transient
-            next_state,rewards,is_end,info = problem.step(action)
+            next_state,rewards,is_end,info = vector_env.step(action_cpu) #这里的action是一个元组
             memory.rewards.append(torch.FloatTensor(rewards).to(opts.device))
             # print('step:{},max_reward:{}'.format(t,torch.max(rewards)))
 
@@ -398,7 +389,7 @@ def train_batch(
 
         # begin update
         # 如果是madde这里的action就不能直接stack
-        old_actions = memory.actions
+        # old_actions = memory.actions
         old_states = torch.stack(memory.states).detach() #.view(t_time, bs, ps, dim_f)
         # old_actions = all_actions.view(t_time, bs, ps, -1)
         # print('old_actions.shape:{}'.format(old_actions.shape))
@@ -446,7 +437,7 @@ def train_batch(
 
             # R = torch.tensor(np.array([r.detach().cpu().numpy() for r in R])) #这里是元组，没法处理
             # R = agent.critic(x_in)[0]
-            critic_output=R.clone()
+            # critic_output=R.clone()
             for r in range(len(reward_reversed)):
                 R = R * gamma + reward_reversed[r]
                 Reward.append(R)
@@ -456,6 +447,7 @@ def train_batch(
             
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach())
+            ratios = ratios.to(opts.device)
             #ratios = torch.cat(( ratios , torch.tensor([1.0,1.0])),dim=0)
             # Finding Surrogate Loss:
             advantages = Reward - bl_val_detached
