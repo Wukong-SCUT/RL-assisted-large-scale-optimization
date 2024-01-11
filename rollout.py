@@ -62,16 +62,18 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
 
     time_eval+=1
     
+    actor = agent.actor
+
     # visualize the rollout process
     for t in tqdm(range(int(T))):
-        
+
         action_test = []
         for _ in range(batch_size):
             state_i = state[_]
             #state_i = state_i.astype(np.float32)
-            actor = Actor()
             action,_,_ = actor.forward(state_i)
-            action_test.append(action)
+            action_test.append(action.detach().cpu())
+        
 
         # if agent:
         #     # if RL_agent is provided, the action is from the agent.actor

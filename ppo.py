@@ -200,10 +200,10 @@ def train(rank, agent, tb_logger):  #这里agent就是ppo
         # step = epoch * (opts.epoch_size // opts.batch_size)
         episode_step = opts.max_fes // opts.fes_one_cmaes #max_fes=3e6,fes_one_cmaes=10000 
         # episode_step=8500
-        pbar = tqdm(total = (opts.K_epochs) * opts.epoch_size  * (episode_step) ,
+        pbar = tqdm(total = 30  , #这里有点问题
                     disable = opts.no_progress_bar or rank!=0, desc = 'training',
                     bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') #这里是不是有点太大了？？ training:   0%|                    | 0/4608000.0 [00:00<?, ?it/s]  4608000？？
-
+                    #(opts.K_epochs) * opts.epoch_size  * (episode_step)
         #for question in training_dataloader:
         batch = opts.one_problem_batch_size*len(training_dataloader)  
         backbone = cmaes
@@ -498,5 +498,5 @@ def train_batch(
         memory.clear_memory()
 
     # return learning steps
-    return ( t // n_step + 1) * K_epochs
+    return ( t // n_step + 1) * K_epochs #此处返还的是3
 

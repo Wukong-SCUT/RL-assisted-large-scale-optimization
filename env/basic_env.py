@@ -284,7 +284,7 @@ class cmaes(gym.Env):
 
         if fes_remaining >= 0:
             self.done = True
-        elif g_best_fitness >= 1e-8:
+        elif g_best_fitness <= 1e-8:
             self.done = True
         else:
             self.done = False
