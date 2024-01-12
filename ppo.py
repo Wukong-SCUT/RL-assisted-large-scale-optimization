@@ -180,7 +180,7 @@ def train(rank, agent, tb_logger):  #这里agent就是ppo
        3.21623644e+12, 6.26348550e+16, 1.83685347e+13, 5.05585378e+13,
        2.92320559e+12, 6.34554712e+16, 6.20060268e+14, 7.58340799e+13])
     # Start the actual training loop
-    for epoch in range(opts.epoch_start, opts.epoch_end): #epoch_start=0,epoch_end=200
+    for epoch in range(opts.epoch_start , opts.epoch_end): #epoch_start=0,epoch_end=200
         # Training mode
         set_random_seed()
         agent.train() #此处只是将actor和critic的状态都设置为train
@@ -200,7 +200,7 @@ def train(rank, agent, tb_logger):  #这里agent就是ppo
         # step = epoch * (opts.epoch_size // opts.batch_size)
         episode_step = opts.max_fes // opts.fes_one_cmaes #max_fes=3e6,fes_one_cmaes=10000 
         # episode_step=8500
-        pbar = tqdm(total = 30  , #这里有点问题
+        pbar = tqdm(total = 300  , #这里有点问题
                     disable = opts.no_progress_bar or rank!=0, desc = 'training',
                     bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') #这里是不是有点太大了？？ training:   0%|                    | 0/4608000.0 [00:00<?, ?it/s]  4608000？？
                     #(opts.K_epochs) * opts.epoch_size  * (episode_step)

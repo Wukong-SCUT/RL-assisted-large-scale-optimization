@@ -282,7 +282,7 @@ class cmaes(gym.Env):
         # 例如，这里定义一个简单的奖励函数
         reward = self.best_fitness
 
-        if fes_remaining >= 0:
+        if fes_remaining == 0:
             self.done = True
         elif g_best_fitness <= 1e-8:
             self.done = True
