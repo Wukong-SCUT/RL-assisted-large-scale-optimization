@@ -175,10 +175,10 @@ def train(rank, agent, tb_logger):  #这里agent就是ppo
 
     # 此处为了节约时间先设置关闭rollout
     # rollout in the 0 epoch model to get the baseline data
-    # init_avg_best,baseline=rollout(test_dataloader,opts,agent,tb_logger,-1)
-    baseline = np.array([2.92242934e+12, 3.01869040e+16, 2.19217652e+13, 5.19558640e+13,
-       3.21623644e+12, 6.26348550e+16, 1.83685347e+13, 5.05585378e+13,
-       2.92320559e+12, 6.34554712e+16, 6.20060268e+14, 7.58340799e+13])
+    init_avg_best,baseline=rollout(test_dataloader,opts,agent,tb_logger,-1)
+    # baseline = np.array([2.92242934e+12, 3.01869040e+16, 2.19217652e+13, 5.19558640e+13,
+    #    3.21623644e+12, 6.26348550e+16, 1.83685347e+13, 5.05585378e+13,
+    #    2.92320559e+12, 6.34554712e+16, 6.20060268e+14, 7.58340799e+13])
     # Start the actual training loop
     for epoch in range(opts.epoch_start , opts.epoch_end): #epoch_start=0,epoch_end=200
         # Training mode
@@ -200,44 +200,47 @@ def train(rank, agent, tb_logger):  #这里agent就是ppo
         # step = epoch * (opts.epoch_size // opts.batch_size)
         episode_step = opts.max_fes // opts.fes_one_cmaes #max_fes=3e6,fes_one_cmaes=10000 
         # episode_step=8500
-        pbar = tqdm(total = 300  , #这里有点问题
+        pbar = tqdm(total = 45*len(training_dataloader)  , #这里有点问题
                     disable = opts.no_progress_bar or rank!=0, desc = 'training',
                     bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') #这里是不是有点太大了？？ training:   0%|                    | 0/4608000.0 [00:00<?, ?it/s]  4608000？？
                     #(opts.K_epochs) * opts.epoch_size  * (episode_step)
-        #for question in training_dataloader:
-        batch = opts.one_problem_batch_size*len(training_dataloader)  
-        backbone = cmaes
-        # backbone={
-        #     'PSO':GPSO_numpy,
-        #     'DMSPSO':DMS_PSO_np,
-        #     'DE':DE_np,
-        #     'madde':MadDE
-        # }.get(opts.backbone,None)
-        assert backbone is not None,'Backbone algorithm is currently not supported'
-        env_list = [lambda e=p,q=question: backbone(q) for p in range(opts.one_problem_batch_size) for question in training_dataloader]
-        
-        #每个问题的环境数量为3，所以总的环境数量为3*问题数量
+        for question in training_dataloader:
+            each_question_batch_num = opts.each_question_batch_num  
+            backbone = cmaes
+            # backbone={
+            #     'PSO':GPSO_numpy,
+            #     'DMSPSO':DMS_PSO_np,
+            #     'DE':DE_np,
+            #     'madde':MadDE
+            # }.get(opts.backbone,None)
+            assert backbone is not None,'Backbone algorithm is currently not supported'
+            env_list = [lambda e = question: backbone(e) for _ in range(each_question_batch_num)]
+            
+            #每个问题的环境数量为3，所以总的环境数量为3*问题数量
 
-        #env_list=[lambda e=p: backbone(question=question) for p in range(batch)] 
-        envs=agent.vector_env(env_list) #创建并行环境
-        # train procedule for a batch
+            #env_list=[lambda e=p: backbone(question=question) for p in range(batch)] 
+            envs=agent.vector_env(env_list) #创建并行环境
+            # train procedule for a batch
 
-        batch_step=train_batch(rank,
-                            envs, #这里是vector_env
-                            agent,  #这里是ppo
-                            pre_step,   #这里是pre_step 开始传入的是0
-                            batch,  #这里是batch
-                            tb_logger,  #这里是tb_logger
-                            opts,
-                            pbar,   #进程表
-                            )
+            batch_step=train_batch(rank,
+                                envs, #这里是vector_env
+                                agent,  #这里是ppo
+                                pre_step,   #这里是pre_step 开始传入的是0
+                                each_question_batch_num,  #这里是batch
+                                tb_logger,  #这里是tb_logger
+                                opts,
+                                pbar,   #进程表
+                                baseline,
+                                init_avg_best
+                                )
+            
+            pre_step += batch_step
+            envs.close()
+            # see if the learning step reach the max_learning_step, if so, stop training
+            if pre_step>=opts.max_learning_step:   #最大学习步骤 乱设了一个10000 因为一开始没有这个参数
+                stop_training=True
+                break
         
-        pre_step += batch_step
-        envs.close()
-        # see if the learning step reach the max_learning_step, if so, stop training
-        if pre_step>=opts.max_learning_step:   #最大学习步骤 乱设了一个10000 因为一开始没有这个参数
-            stop_training=True
-            break
         pbar.close()
 
         # save new model after one epoch
@@ -268,7 +271,7 @@ def train(rank, agent, tb_logger):  #这里agent就是ppo
         print('current_epoch:{}, best_epoch:{}'.format(epoch,best_epoch))
         print('best_epoch_list:{}'.format(best_epoch_list))
         print(f'outperform_ratio_list:{outperform_ratio_list}')
-        #print(f'init_mean_performance:{init_avg_best}')
+        print(f'init_mean_performance:{init_avg_best}')
         #print(f'init_sigma:{init_sigma}')
         print(f'cur_mean_performance:{mean_per_list}')
         #print(f'cur_sigma_performance:{sigma_per_list}')
@@ -287,11 +290,14 @@ def train_batch(
         vector_env, #这里是vector_env
         agent, #这里是ppo
         pre_step, #这里是pre_step 开始传入的是0
-        batch,
+        each_question_batch_num,
         tb_logger,
         opts,
         pbar, #这是一个进度条
+        baseline,
+        init_avg_best
         ):
+
     
     # setup
     agent.train() #切换为训练模型
@@ -333,7 +339,7 @@ def train_batch(
             action_all_cpu = []
             log_lh_all = []
             entro_p_all = []
-            for _ in range(batch):
+            for _ in range(each_question_batch_num):
                 state_i = state[_]
                 action,log_lh,entro_p = agent.actor.forward(state_i)
                 action_all.append(action)
@@ -410,7 +416,7 @@ def train_batch(
 
                 for tt in range(t_time):
 
-                    for i in range(batch):
+                    for i in range(each_question_batch_num):
                     # get new action_prob
                         _, log_p,  entro_p = agent.actor(old_states[tt][i],
                                                         )
@@ -487,9 +493,7 @@ def train_batch(
             if(not opts.no_tb) and rank == 0:
                 if current_step % int(opts.log_step) == 0:
                     log_to_tb_train(tb_logger, agent, Reward, ratios, bl_val_detached, total_cost, grad_norms, memory.rewards, entropy, approx_kl_divergence,
-                                    reinforce_loss, baseline_loss, logprobs,1e6, np.array([2.92242934e+12, 3.01869040e+16, 2.19217652e+13, 5.19558640e+13,
-       3.21623644e+12, 6.26348550e+16, 1.83685347e+13, 5.05585378e+13,
-       2.92320559e+12, 6.34554712e+16, 6.20060268e+14, 7.58340799e+13]), opts.show_figs, current_step)
+                                    reinforce_loss, baseline_loss, logprobs, init_avg_best, baseline, opts.show_figs, current_step)
 
             if rank == 0: pbar.update(1)
             # end update

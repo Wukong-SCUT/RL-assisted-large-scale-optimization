@@ -266,7 +266,7 @@ class cmaes(gym.Env):
         g_best_fitness = self.best_fitness
         g_best_fitness_boosting_ratio = 1
 
-        fes_remaining = 3e6 - self.fes
+        fes_remaining = 1.5e6 - self.fes
 
 
         self.done = False

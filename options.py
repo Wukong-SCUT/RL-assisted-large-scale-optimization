@@ -15,7 +15,7 @@ def get_options(args=None):
     parser.add_argument('--max_fes', type=int, default=3e6, help='maximum number of function evaluations')
 
     #problem settings
-    parser.add_argument('--divide_method', default="train_sep", choices=["random_divide", "train_sep", "train_sep_parsep", "train_sep_parsep_2"], help='method to divide the problem set')
+    parser.add_argument('--divide_method', default="train_demo", choices=["random_divide", "train_sep", "train_sep_parsep", "train_sep_parsep_2"], help='method to divide the problem set')
     
     #rollout settings
     parser.add_argument('--fes_one_cmaes', type=int, default=10000, help='number of function evaluations for each cmaes')
@@ -23,6 +23,7 @@ def get_options(args=None):
     parser.add_argument('--per_eval_time',  type=int, default=1, help='number of evaluations for each instance')
 
     #PPO settings
+    parser.add_argument('--each_question_batch_num', type=int, default=5, help='number of instances for each problem')
     parser.add_argument('--lr_critic', type=float, default=1e-5, help="learning rate for the critic network")
     parser.add_argument('--state', default=[0.0 for _ in range(15)], help='initial state of actor') 
     #此处单纯为了创建一个actor实例，数值没有实际意义，此处不用np的目的是run中需要转换为json文件
@@ -31,7 +32,7 @@ def get_options(args=None):
     #parser.add_argument('--batch_size', type=int, default=2, help='number of instances per batch during training')
     parser.add_argument('--feature_num', type=int, default=15, help='number of features of each instance')
     parser.add_argument('--max_learning_step', type=int, default=10000, help='number of iterations for training')
-    parser.add_argument('--update_best_model_epochs', type=int, default=10, help='number of iterations for training')
+    parser.add_argument('--update_best_model_epochs', type=int, default=5, help='number of iterations for training')
 
     #run settings
     parser.add_argument('--no_tb', action='store_true', help='disable Tensorboard logging')

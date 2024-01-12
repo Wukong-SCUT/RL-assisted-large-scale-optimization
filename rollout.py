@@ -20,7 +20,7 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
         rollout_name='PPO-'+rollout_name
         agent.eval() 
     
-    T =(opts.max_fes // opts.fes_one_cmaes) / 300 #3e6/10000=300 cc-cmaes 要迭代的次数
+    T =(opts.max_fes // opts.fes_one_cmaes) / 3 #3e6/10000=300 cc-cmaes 要迭代的次数
 
     # to store the whole rollout process
     batch_size = len(dataloader)*opts.one_problem_batch_size

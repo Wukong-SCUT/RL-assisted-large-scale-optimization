@@ -13,6 +13,9 @@ class Make_dataset:
             all_numbers = list(range(1, 16))
             train_problem_set = random.sample(all_numbers, 6)
             test_problem_set = list(set(all_numbers) - set(train_problem_set))
+        elif self.divide_method == "train_demo":
+            train_problem_set = [1, 2, 4, 10]
+            test_problem_set = [7, 8, 9, 10, 11, 12, 13, 14, 15]
         elif self.divide_method == "train_sep":
             train_problem_set = [1, 2, 3]
             test_problem_set = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
@@ -22,6 +25,7 @@ class Make_dataset:
         elif self.divide_method == "train_sep_parsep_2":
             train_problem_set = [1, 2, 3, 8, 9, 10, 11]
             test_problem_set = [4, 5, 6, 7, 12, 13, 14, 15]
+
 
         if train_or_test == "train":
             return train_problem_set
