@@ -1,6 +1,7 @@
 from torch import nn
 import torch
 from Ppo.nets_transformer.graph_layers import MLP_for_actor
+# from math import log 
 import torch.nn.functional as F
 
 # class mySequential(nn.Sequential):
@@ -37,11 +38,11 @@ class Actor(nn.Module):
     def __init__(self):
         super(Actor, self).__init__()
 
-        self.input_dim = 16 #和state+1的维度一致 这里实际上扩展性不好
+        self.input_dim = 14 #和state+1的维度一致 这里实际上扩展性不好
         
 
         # 网络创建
-        self.CC_method_net = MLP_for_actor(self.input_dim, 1, 1)
+        self.CC_method_net = MLP_for_actor(self.input_dim, 10, 3)
 
         # input  : [CC_method_num, state_1, state_2,..., state_n]
         # output : pobability in the state
@@ -62,15 +63,16 @@ class Actor(nn.Module):
         """
         x_in: 放入state
         """
-        self.state = torch.tensor(state)
+        #self.state = torch.tensor(state).cuda()
+        self.state = torch.tensor(state).to('cuda')
         
-        x_in_0 = torch.cat((torch.tensor([0], device='cuda') ,self.state),-1)
-        x_in_1 = torch.cat((torch.tensor([1], device='cuda') ,self.state),-1)
-        x_in_2 = torch.cat((torch.tensor([2], device='cuda') ,self.state),-1)
+        # x_in_0 = torch.cat((torch.zeros(self.state.shape[0], 1).to('cpu') ,self.state),1)
+        # x_in_1 = torch.cat((torch.ones(self.state.shape[0], 1).to('cpu') ,self.state),1)
+        # x_in_2 = torch.cat((2*torch.ones(self.state.shape[0], 1).to('cpu') ,self.state),1)
 
-        input_tensor = torch.stack([x_in_0, x_in_1, x_in_2])
+        # input_tensor = torch.stack([x_in_0, x_in_1, x_in_2])
 
-        score = self.CC_method_net(input_tensor.to('cuda')) 
+        score = self.CC_method_net(state) 
         #print(score)
         action_prob = F.softmax(score, dim=-1) 
         action_dist = torch.distributions.Categorical(action_prob)
@@ -78,39 +80,57 @@ class Actor(nn.Module):
         # if fixed_action is not None:
         #     action = torch.tensor(fixed_action)
         # else:
-        action = action_dist.sample()
         
-        log_prob = action_dist.log_prob(action)
+        # action = []
+        # action_cpu = []
+        # ll = []
+        # entropy = []
+        # for _ in range(len(score)):
+        #     action_ = action_dist.sample()
+        #     action_cpu.append(action_.cpu())
+        #     action.append(action_)
 
-        ll = log_prob
+        #     log_prob_ = action_dist.log_prob(action_)
+        #     ll_ = log_prob_
+        #     ll.append(ll_)
 
-        entropy = action_dist.entropy()  # for logging only
+        #     entropy_ = action_dist.entropy()  # for logging only
+        #     entropy.append(entropy_)
+
+        action = action_dist.sample()
+        ll = action_dist.log_prob(action).cpu().detach().numpy()
+        entropy = action_dist.entropy().cpu().detach().numpy()  # for logging only
+
         out = (action,ll,entropy)
 
         return out  #注意此处一开始就是元组
     
 
+if __name__ == '__main__':
+    from graph_layers import MLP_for_actor
+    # 创建一个 Actor 实例
+    actor = Actor()
 
-# # 创建一个 Actor 实例
-# actor = Actor()
+    # 打印模型参数
+    print(actor.get_parameter_number())
 
-# # 打印模型参数
-# print(actor.get_parameter_number())
+    state=[[ 2.0, 3.0, 0.5, 0.2,
+                0.9, 0.1, 0.5,
+                10.0, 1.0, 5.0, 2.0,
+                100.0, 0.2,
+                500, 0.01 ],[5.0, 1.0, 0.5, 0.2,
+                0.9, 0.1, 0.5,
+                10.0, 1.0, 5.0, 2.0,
+                100.0, 0.2,
+                500, 0.01 ]]
+    state = torch.tensor(state)
+    
+    
+    # 使用 forward 方法得到输出
+    output = actor(state)
 
-# # 使用 forward 方法得到输出
-# output = actor(state=[[1.0, 2.0, 3.0, 0.5, 0.2,
-#               0.9, 0.1, 0.5,
-#               10.0, 1.0, 5.0, 2.0,
-#               100.0, 0.2,
-#               500, 0.01 ],[1.0, 2.0, 3.0, 0.5, 0.2,
-#               0.9, 0.1, 0.5,
-#               10.0, 1.0, 5.0, 2.0,
-#               100.0, 0.2,
-#               500, 0.01 ]])
+    print(output)
 
-# action,_,_ = actor()
-# print(output)
-# print(action.item())
 
 
 # 创建 Actor 模型

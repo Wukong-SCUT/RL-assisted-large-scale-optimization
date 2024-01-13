@@ -30,7 +30,7 @@ def get_options(args=None):
     parser.add_argument('--test', type=int, default=0, help='swith to test mode')
     parser.add_argument('--device', default='cuda', choices=['cpu'], help='device to use for training / testing')
     #parser.add_argument('--batch_size', type=int, default=2, help='number of instances per batch during training')
-    parser.add_argument('--feature_num', type=int, default=15, help='number of features of each instance')
+    parser.add_argument('--feature_num', type=int, default=14, help='number of features of each instance')
     parser.add_argument('--max_learning_step', type=int, default=10000, help='number of iterations for training')
     parser.add_argument('--update_best_model_epochs', type=int, default=5, help='number of iterations for training')
 

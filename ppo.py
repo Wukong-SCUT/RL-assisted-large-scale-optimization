@@ -335,25 +335,29 @@ def train_batch(
             memory.states.append(state.clone())
 
             #这里有点问题，这个actor需要再检查
-            action_all = []
-            action_all_cpu = []
-            log_lh_all = []
-            entro_p_all = []
-            for _ in range(each_question_batch_num):
-                state_i = state[_]
-                action,log_lh,entro_p = agent.actor.forward(state_i)
-                action_all.append(action)
-                action_all_cpu.append(action.detach().cpu())
-                log_lh_all.append(log_lh)
-                entro_p_all.append(entro_p)
+            # action_all = []
+            # action_all_cpu = []
+            # log_lh_all = []
+            # entro_p_all = []
             
-            action = action_all #这里action转入了cpu
-            action_cpu = action_all_cpu
-            log_lh = log_lh_all
-            entro_p = entro_p_all
+            # for _ in range(each_question_batch_num):
+            #     state_i = state[_]
+            #     action,log_lh,entro_p = agent.actor.forward(state_i)
+            #     action_all.append(action)
+            #     action_all_cpu.append(action.detach().cpu())
+            #     log_lh_all.append(log_lh)
+            #     entro_p_all.append(entro_p)
+            
+            # action = action_all #这里action转入了cpu
+            # action_cpu = action_all_cpu
+            # log_lh = log_lh_all
+            # entro_p = entro_p_all
+
+            action,log_lh,entro_p = agent.actor(state)
+            action_cpu = action.detach().cpu()
             
 
-            memory.actions.append(action.copy())
+            memory.actions.append(action)
             memory.logprobs.append(log_lh)
             #action=action.cpu().numpy()
 
@@ -416,13 +420,12 @@ def train_batch(
 
                 for tt in range(t_time):
 
-                    for i in range(each_question_batch_num):
+                    # for i in range(each_question_batch_num):
                     # get new action_prob
-                        _, log_p,  entro_p = agent.actor(old_states[tt][i],
-                                                        )
+                    _, log_p,  entro_p = agent.actor(old_states[tt])
 
-                        logprobs.append(log_p)
-                        entropy.append(entro_p.detach().cpu())
+                    logprobs.append(log_p)
+                    entropy.append(entro_p)
 
                     baseline_val_detached, baseline_val = agent.critic(state)
 

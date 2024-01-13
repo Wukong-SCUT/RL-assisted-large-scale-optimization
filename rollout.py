@@ -67,14 +67,9 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
     # visualize the rollout process
     for t in tqdm(range(int(T))):
 
-        action_test = []
-        for _ in range(batch_size):
-            state_i = state[_]
-            #state_i = state_i.astype(np.float32)
-            action,_,_ = actor.forward(state_i)
-            action_test.append(action.detach().cpu())
+        action,_,_ = actor(state)
+        action_cpu = action.detach().cpu()
         
-
         # if agent:
         #     # if RL_agent is provided, the action is from the agent.actor
         #     action,_,_ = agent.actor(state)
@@ -85,7 +80,7 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
         #     action=np.zeros(opts.batch_size)
         
         # put action into environment(backbone algorithm to be specific)
-        next_state,rewards,is_end,info = problem.step(action_test)
+        next_state,rewards,is_end,info = problem.step(action_cpu)
 
         state=next_state
         if agent:

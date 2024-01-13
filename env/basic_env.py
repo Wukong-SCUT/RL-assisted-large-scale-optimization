@@ -100,7 +100,9 @@ class cmaes(gym.Env):
         self.D = self.info["dimension"]
         self.ub = self.info['upper']
         self.lb = self.info['lower']
-        self.sigma = (self.ub - self.lb) * 0.5
+        self.search_scope = self.ub - self.lb
+        self.search_scope_half = self.search_scope * 0.5
+        self.sigma = self.search_scope * 0.5
 
         self.fun_fitness = bench.get_function(question)
 
@@ -136,10 +138,11 @@ class cmaes(gym.Env):
 
         self.fes = 0
 
-        Xw_var = np.std(self.global_Xw)
+        Xw_std = np.std(self.global_Xw)
         Xw_mean = np.mean(self.global_Xw)
         Xw_max = np.max(self.global_Xw)
         Xw_min = np.min(self.global_Xw)
+        Xw_CV = abs(Xw_std / Xw_mean) #CV是变异系数可以消除量纲
 
         # 使用 np.corrcoef 计算相关系数矩阵
         correlation_matrix = np.corrcoef(self.global_C)
@@ -152,22 +155,25 @@ class cmaes(gym.Env):
         g_best_min = np.min(self.best)
         g_best_mean = np.mean(self.best)
         g_best_std = np.std(self.best)
+        g_best_CV = abs(g_best_std / g_best_mean) #CV是变异系数可以消除量纲
 
         g_best_fitness = self.best_fitness
+        self.origin_g_best_fitness = g_best_fitness
+
         g_best_fitness_boosting_ratio = 1
 
-        fes_remaining = 3e6 - self.fes
+        fes_remaining = 1e6 - self.fes
 
         sigma = (self.ub - self.lb) * 0.5
 
         self.done = False
 
         self.state = [
-            Xw_var, Xw_mean, Xw_max, Xw_min,
+            Xw_CV, Xw_mean/self.search_scope_half, Xw_max/self.search_scope_half, Xw_min/self.search_scope_half,
             correlation_matrix_max, correlation_matrix_min, correlation_matrix_mean,
-            g_best_max, g_best_min, g_best_mean, g_best_std,
-            g_best_fitness, g_best_fitness_boosting_ratio,
-            fes_remaining, sigma
+            g_best_max/self.search_scope_half, g_best_min/self.search_scope_half, g_best_mean/self.search_scope_half, g_best_CV,
+            g_best_fitness_boosting_ratio,
+            fes_remaining/1e6, sigma/self.search_scope
                                 ] 
 
         return self.state
@@ -246,10 +252,11 @@ class cmaes(gym.Env):
 
             self.sigma = sub_es.sigma
         
-        Xw_var = np.std(self.global_Xw)
+        Xw_std = np.std(self.global_Xw)
         Xw_mean = np.mean(self.global_Xw)
         Xw_max = np.max(self.global_Xw)
         Xw_min = np.min(self.global_Xw)
+        Xw_CV = abs(Xw_std / Xw_mean)
 
         # 使用 np.corrcoef 计算相关系数矩阵
         correlation_matrix = np.corrcoef(self.global_C)
@@ -262,25 +269,26 @@ class cmaes(gym.Env):
         g_best_min = np.min(self.best)
         g_best_mean = np.mean(self.best)
         g_best_std = np.std(self.best)
+        g_best_CV = abs(g_best_std / g_best_mean)
 
         g_best_fitness = self.best_fitness
-        g_best_fitness_boosting_ratio = 1
+        g_best_fitness_boosting_ratio = g_best_fitness / self.origin_g_best_fitness
 
-        fes_remaining = 1.5e6 - self.fes
+        fes_remaining = 1e6 - self.fes
 
 
         self.done = False
 
         self.state = [
-            Xw_var, Xw_mean, Xw_max, Xw_min,
+            Xw_CV, Xw_mean/self.search_scope_half, Xw_max/self.search_scope_half, Xw_min/self.search_scope_half,
             correlation_matrix_max, correlation_matrix_min, correlation_matrix_mean,
-            g_best_max, g_best_min, g_best_mean, g_best_std,
-            g_best_fitness, g_best_fitness_boosting_ratio,
-            fes_remaining, self.sigma
+            g_best_max/self.search_scope_half, g_best_min/self.search_scope_half, g_best_mean/self.search_scope_half, g_best_CV,
+            g_best_fitness_boosting_ratio,
+            fes_remaining/1e6, self.sigma
                                 ] 
         
         # 例如，这里定义一个简单的奖励函数
-        reward = self.best_fitness
+        reward = g_best_fitness_boosting_ratio
 
         if fes_remaining == 0:
             self.done = True

@@ -15,7 +15,7 @@ class Make_dataset:
             test_problem_set = list(set(all_numbers) - set(train_problem_set))
         elif self.divide_method == "train_demo":
             train_problem_set = [1, 2, 4, 10]
-            test_problem_set = [7, 8, 9, 10, 11, 12, 13, 14, 15]
+            test_problem_set = [3, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15]
         elif self.divide_method == "train_sep":
             train_problem_set = [1, 2, 3]
             test_problem_set = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
