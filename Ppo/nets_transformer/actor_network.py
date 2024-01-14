@@ -38,11 +38,11 @@ class Actor(nn.Module):
     def __init__(self):
         super(Actor, self).__init__()
 
-        self.input_dim = 14 #和state+1的维度一致 这里实际上扩展性不好
+        self.input_dim = 12 #opts 
         
 
         # 网络创建
-        self.CC_method_net = MLP_for_actor(self.input_dim, 10, 3)
+        self.CC_method_net = MLP_for_actor(self.input_dim, 10, 3) 
 
         # input  : [CC_method_num, state_1, state_2,..., state_n]
         # output : pobability in the state
@@ -59,7 +59,7 @@ class Actor(nn.Module):
         trainable_num = sum(p.numel() for p in self.parameters() if p.requires_grad)
         return {'Actor: Total': total_num, 'Trainable': trainable_num}
 
-    def forward(self, state):
+    def forward(self, state, fixed_action=None):
         """
         x_in: 放入state
         """
@@ -96,10 +96,13 @@ class Actor(nn.Module):
 
         #     entropy_ = action_dist.entropy()  # for logging only
         #     entropy.append(entropy_)
-
-        action = action_dist.sample()
-        ll = action_dist.log_prob(action).cpu().detach().numpy()
-        entropy = action_dist.entropy().cpu().detach().numpy()  # for logging only
+        if fixed_action is not None:
+            action = torch.tensor(fixed_action)
+        else:
+            action = action_dist.sample() 
+        
+        ll = action_dist.log_prob(action)
+        entropy = action_dist.entropy()
 
         out = (action,ll,entropy)
 

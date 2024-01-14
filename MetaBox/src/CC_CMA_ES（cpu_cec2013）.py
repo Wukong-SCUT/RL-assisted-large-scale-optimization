@@ -264,6 +264,8 @@ for _ in tqdm(range(300),desc = "Overall Process"): #fes = 3e6:
             global_C[np.ix_(init_vector.positions[i], init_vector.positions[i])] = sub_es.C
 
         sigma = sub_es.sigma
+        sys.stdout = original_stdout
+        print("sigma:",sigma)
 
     cycle += 1
     record.cycle_record.append(cycle)

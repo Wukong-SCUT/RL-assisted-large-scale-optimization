@@ -30,7 +30,7 @@ class Critic(nn.Module):
         # pass through value_head, get estimated value
         baseline_value = self.value_head(h_features)
 
-        return baseline_value.detach().squeeze(), baseline_value.squeeze()
+        return baseline_value.detach().squeeze(), baseline_value.squeeze()  #记录一下
 
     def get_parameter_number(self):
         total_num = sum(p.numel() for p in self.parameters())

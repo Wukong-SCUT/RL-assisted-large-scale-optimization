@@ -142,11 +142,14 @@ class cmaes(gym.Env):
         Xw_mean = np.mean(self.global_Xw)
         Xw_max = np.max(self.global_Xw)
         Xw_min = np.min(self.global_Xw)
+
         Xw_CV = abs(Xw_std / Xw_mean) #CV是变异系数可以消除量纲
 
         # 使用 np.corrcoef 计算相关系数矩阵
         correlation_matrix = np.corrcoef(self.global_C)
 
+        corr_matrix = correlation_matrix.copy()
+        np.fill_diagonal(corr_matrix, 0)
         correlation_matrix_max = np.max(correlation_matrix)
         correlation_matrix_min = np.min(correlation_matrix)
         correlation_matrix_mean = np.mean(correlation_matrix)
@@ -155,26 +158,28 @@ class cmaes(gym.Env):
         g_best_min = np.min(self.best)
         g_best_mean = np.mean(self.best)
         g_best_std = np.std(self.best)
+
         g_best_CV = abs(g_best_std / g_best_mean) #CV是变异系数可以消除量纲
 
         g_best_fitness = self.best_fitness
+
         self.origin_g_best_fitness = g_best_fitness
 
         g_best_fitness_boosting_ratio = 1
 
-        fes_remaining = 1e6 - self.fes
+        fes_remaining = 1e6 - self.fes #opts存1e6
 
         sigma = (self.ub - self.lb) * 0.5
 
         self.done = False
 
         self.state = [
-            Xw_CV, Xw_mean/self.search_scope_half, Xw_max/self.search_scope_half, Xw_min/self.search_scope_half,
+             Xw_mean/self.search_scope_half, Xw_max/self.search_scope_half, Xw_min/self.search_scope_half,
             correlation_matrix_max, correlation_matrix_min, correlation_matrix_mean,
-            g_best_max/self.search_scope_half, g_best_min/self.search_scope_half, g_best_mean/self.search_scope_half, g_best_CV,
+            g_best_max/self.search_scope_half, g_best_min/self.search_scope_half, g_best_mean/self.search_scope_half, 
             g_best_fitness_boosting_ratio,
-            fes_remaining/1e6, sigma/self.search_scope
-                                ] 
+            fes_remaining/1e6, sigma/self.search_scope_half
+                                ] #记录abs（state）max
 
         return self.state
 
@@ -261,7 +266,9 @@ class cmaes(gym.Env):
         # 使用 np.corrcoef 计算相关系数矩阵
         correlation_matrix = np.corrcoef(self.global_C)
 
-        correlation_matrix_max = np.max(correlation_matrix)
+        corr_matrix = correlation_matrix.copy()
+        np.fill_diagonal(corr_matrix, 0)
+        correlation_matrix_max = np.max(corr_matrix)
         correlation_matrix_min = np.min(correlation_matrix)
         correlation_matrix_mean = np.mean(correlation_matrix)
 
@@ -275,22 +282,44 @@ class cmaes(gym.Env):
         g_best_fitness_boosting_ratio = g_best_fitness / self.origin_g_best_fitness
 
         fes_remaining = 1e6 - self.fes
-
+        
+        sys.stdout = original_stdout
+        
+        if self.sigma >= 100:
+            sigma = 100
+        else:
+            sigma = self.sigma
 
         self.done = False
 
         self.state = [
-            Xw_CV, Xw_mean/self.search_scope_half, Xw_max/self.search_scope_half, Xw_min/self.search_scope_half,
+            Xw_mean/self.search_scope_half, Xw_max/self.search_scope_half, Xw_min/self.search_scope_half,
             correlation_matrix_max, correlation_matrix_min, correlation_matrix_mean,
-            g_best_max/self.search_scope_half, g_best_min/self.search_scope_half, g_best_mean/self.search_scope_half, g_best_CV,
+            g_best_max/self.search_scope_half, g_best_min/self.search_scope_half, g_best_mean/self.search_scope_half, 
             g_best_fitness_boosting_ratio,
-            fes_remaining/1e6, self.sigma
+            fes_remaining/1e6, sigma/self.search_scope_half
                                 ] 
         
+        # 找到最大值和对应的索引
+        # max_value, max_index = max((value, index) for index, value in enumerate(self.state))
+
+        # # 获取对应的名称
+        # max_name = [
+        #      "Xw_mean/search_scope_half", "Xw_max/search_scope_half", "Xw_min/search_scope_half",
+        #     "correlation_matrix_max", "correlation_matrix_min", "correlation_matrix_mean",
+        #     "g_best_max/search_scope_half", "g_best_min/search_scope_half", "g_best_mean/search_scope_half", 
+        #     "g_best_fitness_boosting_ratio",
+        #     "fes_remaining/1e6"
+        # ][max_index]
+
+        # # 打印结果
+        # sys.stdout = original_stdout
+        # print(f"The maximum value is {max_value} for the state variable {max_name}.")
+
         # 例如，这里定义一个简单的奖励函数
         reward = g_best_fitness_boosting_ratio
 
-        if fes_remaining == 0:
+        if fes_remaining <= 0:
             self.done = True
         elif g_best_fitness <= 1e-8:
             self.done = True
@@ -308,7 +337,7 @@ if __name__ == '__main__':
         env.step(random.choice([0, 1, 2]))
         if i == 1:
             sys.stdout = original_stdout
-            print(env.best_fitness)
+            #print(env.best_fitness)
     sys.stdout = original_stdout
     print(env.best_fitness)
 
