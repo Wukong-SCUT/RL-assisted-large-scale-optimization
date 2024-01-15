@@ -21,7 +21,14 @@ from env.venvs import SubprocVectorEnv
 from Ppo.utils.make_dataset import Make_dataset 
 from rollout import rollout
 from env.basic_env import cmaes
+import pandas as pd
+from openpyxl import load_workbook
 
+# 指定输出文件夹路径
+output_folder = 'RL_assist/output_files/output_lr_1e-5'
+
+# 创建输出文件夹，如果不存在的话
+os.makedirs(output_folder, exist_ok=True)
 
 # memory for recording transition during training process
 class Memory:
@@ -175,7 +182,11 @@ def train(rank, agent, tb_logger):  #这里agent就是ppo
 
     # 此处为了节约时间先设置关闭rollout
     # rollout in the 0 epoch model to get the baseline data
-    init_avg_best,baseline=rollout(test_dataloader,opts,agent,tb_logger,-1)
+    baseline_all = {'1':18004806.63, '2':2473.74789187304, '3':20.1812018587071, '4':60798610661.5867, '5':9136356.05, '6':1057675.98232308, '7':561349654.297463,
+                '8':2989332805662390, '9':526718730.623028, '10':93949538.660442, '11':91704674695.1519, '12':1232.46609753493, '13':10019658256.2841,
+                '14':350069430500.856, '15':13373771.8541858}
+    
+    # init_avg_best,baseline=rollout(test_dataloader,opts,agent,tb_logger,-1)
     # baseline = np.array([2.92242934e+12, 3.01869040e+16, 2.19217652e+13, 5.19558640e+13,
     #    3.21623644e+12, 6.26348550e+16, 1.83685347e+13, 5.05585378e+13,
     #    2.92320559e+12, 6.34554712e+16, 6.20060268e+14, 7.58340799e+13])
@@ -198,15 +209,20 @@ def train(rank, agent, tb_logger):  #这里agent就是ppo
 
         # start training
         # step = epoch * (opts.epoch_size // opts.batch_size)
-        episode_step = opts.max_fes // opts.fes_one_cmaes #max_fes=3e6,fes_one_cmaes=10000 
+        # episode_step = opts.max_fes // opts.fes_one_cmaes #max_fes=3e6,fes_one_cmaes=10000 
         # episode_step=8500
-        pbar = tqdm(total = 45*len(training_dataloader)  , #这里有点问题
+            
+        pbar = tqdm(total = 30*len(training_dataloader)  , #这里有点问题
                     disable = opts.no_progress_bar or rank!=0, desc = 'training',
                     bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') #这里是不是有点太大了？？ training:   0%|                    | 0/4608000.0 [00:00<?, ?it/s]  4608000？？
                     #(opts.K_epochs) * opts.epoch_size  * (episode_step)
         
         for question in training_dataloader:
+
             each_question_batch_num = opts.each_question_batch_num  #5
+
+            baseline =[ baseline_all[str(question)] for _ in range(each_question_batch_num) ]
+
             backbone = cmaes
             # backbone={
             #     'PSO':GPSO_numpy,
@@ -217,8 +233,6 @@ def train(rank, agent, tb_logger):  #这里agent就是ppo
             assert backbone is not None,'Backbone algorithm is currently not supported'
             env_list = [lambda e = question: backbone(e) for _ in range(each_question_batch_num)]
             
-            
-
             #env_list=[lambda e=p: backbone(question=question) for p in range(batch)] 
             envs=agent.vector_env(env_list) #创建并行环境
             # train procedule for a batch
@@ -227,12 +241,10 @@ def train(rank, agent, tb_logger):  #这里agent就是ppo
                                 envs, #这里是vector_env
                                 agent,  #这里是ppo
                                 pre_step,   #这里是pre_step 开始传入的是0
-                                each_question_batch_num,  #这里是batch
                                 tb_logger,  #这里是tb_logger
                                 opts,
                                 pbar,   #进程表
-                                baseline,
-                                init_avg_best
+                                baseline
                                 )
             
             pre_step += batch_step
@@ -251,9 +263,10 @@ def train(rank, agent, tb_logger):  #这里agent就是ppo
                                        
         if (epoch-opts.epoch_start) % opts.update_best_model_epochs==0 or epoch == opts.epoch_end-1: #update_best_model_epochs 乱设了一个99999 因为一开始没有这个参数
             # validate the new model
-            avg_best,per_problem_performance=rollout(test_dataloader,opts,agent,tb_logger,-1)
+            avg_best,_=rollout(test_dataloader,opts,agent,tb_logger,-1)
+            baseline = [ baseline_all[str(question)] for _ in range(len(test_dataloader)) ]
             #avg_best,sigma,per_problem_performance=rollout(test_dataloader,opts,agent,tb_logger,epoch)
-            outperform_ratio=np.sum(per_problem_performance<baseline)/len(baseline)
+            outperform_ratio=np.sum(avg_best<baseline)/len(baseline)
             #这里要检查一下
             #tb_logger.add_scalar('performance/outperform_ratio',outperform_ratio,epoch)
             mean_per_list.append(avg_best)
@@ -272,7 +285,7 @@ def train(rank, agent, tb_logger):  #这里agent就是ppo
         print('current_epoch:{}, best_epoch:{}'.format(epoch,best_epoch))
         print('best_epoch_list:{}'.format(best_epoch_list))
         print(f'outperform_ratio_list:{outperform_ratio_list}')
-        print(f'init_mean_performance:{init_avg_best}')
+        #print(f'init_mean_performance:{init_avg_best}')
         #print(f'init_sigma:{init_sigma}')
         print(f'cur_mean_performance:{mean_per_list}')
         #print(f'cur_sigma_performance:{sigma_per_list}')
@@ -291,12 +304,10 @@ def train_batch(
         vector_env, #这里是vector_env
         agent, #这里是ppo
         pre_step, #这里是pre_step 开始传入的是0
-        each_question_batch_num,
         tb_logger,
         opts,
         pbar, #这是一个进度条
         baseline,
-        init_avg_best
         ):
 
     
@@ -355,7 +366,8 @@ def train_batch(
 
 
             # state transient
-            next_state,rewards,is_end,info = vector_env.step(action_cpu) #这里的action是一个元组
+            next_state, rewards, is_end, info = vector_env.step(action_cpu)
+            
             memory.rewards.append(torch.FloatTensor(rewards).to(opts.device))
 
             state_next = next_state
@@ -363,6 +375,37 @@ def train_batch(
             # print('step:{},max_reward:{}'.format(t,torch.max(rewards)))
 
             # store info
+            if info[0]['Fes'] >= 1e6:
+                    
+                    question = info[0]['question']
+                    # info_without_env_id = np.array([{k: v for k, v in d.items() if k != 'env_id'} for d in info], dtype=object)
+                    # 转换为 pandas 的 DataFrame
+                    df = pd.DataFrame([info[0]])
+                    # 使用 pd.concat 连接第二个元素（字典）的 DataFrame
+                    for i in range(1, len(info)):
+                        df = pd.concat([df, pd.DataFrame([info[i]])], ignore_index=True)
+                    
+                    # 根据 'question' 和 'Fes' 进行分组，并计算最大值、最小值、平均值
+                    result_table = df.groupby(['question', 'Fes']).agg({'gbest_val': ['max', 'min', 'mean']}).reset_index()
+
+                    # 指定文件夹路径和文件名，将结果保存为 Excel 文件
+                    
+                    output_file = f'{output_folder}_{question}_output.xlsx'
+                    result_table.to_excel(output_file, index=True)
+
+                    # # 设置输出文件路径
+                    # output_file = f'{output_folder}output.xlsx'
+
+                    # # 检查文件是否存在
+                    # try:
+                    #     # 尝试加载现有 Excel 文件
+                    #     with pd.ExcelWriter(output_file, engine='openpyxl', mode='a') as writer:
+                    #         # 如果文件存在，将 DataFrame 追加到现有的 sheet 上
+                    #         result_table.to_excel(writer, sheet_name='Sheet1', index=False, header=False)
+                    # except FileNotFoundError:
+                    #     # 如果文件不存在，直接创建新的 Excel 文件
+                    #     result_table.to_excel(output_file, index=True)
+
             # total_cost = total_cost + gbest_val
 
             # next
@@ -479,7 +522,7 @@ def train_batch(
             if(not opts.no_tb) and rank == 0:
                 if current_step % int(opts.log_step) == 0:
                     log_to_tb_train(tb_logger, agent, Reward, ratios, bl_val_detached, total_cost, grad_norms, memory.rewards, entropy, approx_kl_divergence,
-                                    reinforce_loss, baseline_loss, logprobs, init_avg_best, baseline, opts.show_figs, current_step, R , state, state_next)
+                                    reinforce_loss, baseline_loss, logprobs, baseline, opts.show_figs, current_step, R , state, state_next)
 
             if rank == 0: pbar.update(1)
             # end update

@@ -124,7 +124,7 @@ def rollout(dataloader,opts,agent=None,tb_logger=None, epoch_id=0):
     # if tb_logger:
     #     log_to_tb_val(tb_logger,cost_rollout,epoch_id)
     
-    collect_gbest
+
     # 将数组按照每3个一组分割
     groups = np.array_split(collect_gbest, len(collect_gbest) // opts.one_problem_batch_size)
 

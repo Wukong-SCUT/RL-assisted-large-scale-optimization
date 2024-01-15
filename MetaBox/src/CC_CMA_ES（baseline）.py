@@ -129,7 +129,7 @@ method_mapping_num = {
 
 def problem(x):
     global fes
-    fes += sub_popsize
+    fes += 1
     x = np.ascontiguousarray(x)
     #x = np.array(x)
     return fun_fitness(x) #fun_fitness(x)F3.func(x)
@@ -147,151 +147,176 @@ output_folder = 'RL_assist/output_files'
 # 创建输出文件夹，如果不存在的话
 os.makedirs(output_folder, exist_ok=True)
 
+excel_data = []
+
 for question in range(1, 16):
-    excel_data = []
-
-    fun_fitness = bench.get_function(question)
-    info = bench.get_info(question)
-    search_scope = info['upper']-info['lower']
-    sigma = search_scope*0.5
-
-    #参数初始化
-    D = info["dimension"]
-    m = 20
-    fes = 0
-    cycle_num = 5
-    cycle = 0
-
-    sub_popsize = 50
-
-    # MetaBox接口
-    # F3= MetaBox_problem.F3(dim=D,shift=np.random.uniform(info['lower'], info['upper'], size=D),rotate=np.eye(D),bias=0,lb=info['lower'],ub=info['upper'])
-
-    #CC层初始化
-    CC_method = ["MiVD", "MaVD", "RD"]
-
-    #cma-es初始化
-    random_vectors = np.random.uniform(info['lower'], info['upper'], size=(200, D))
-    global_C = np.eye(D)
-    global_Xw = np.random.uniform(info['lower'], info['upper'], size=D)
-
-    # 计算每个向量对应的函数值
-    function_values = np.array([problem(random_vectors[i]) for i in np.arange(200)])
-
-    # 找到最小值和对应的索引
-    min_index = np.argmin(function_values)
-
-    #记录器初始化
-    record = Record(cycle_num)   
-
-    best= random_vectors[min_index]
-    best_fitness = function_values[min_index]
-    record.best.insert(0,best_fitness) #记录第一次的best
-
-    cycle += 1
-    record.cycle_record.append(cycle)
-    record.fitness_record.append(best_fitness)
-
-
-    # 保存原始的 sys.stdout
-    original_stdout = sys.stdout
-
-    fes = 0
-
-    for _ in tqdm(range(300),desc = "Overall Process"): #fes = 3e6:
-
-        #CC层选择：分解方式选择
-        column_sum = np.sum(record.per_record, axis=1)  # 按行求和
-        exp_column_sum = np.exp(column_sum)  # 对每个元素取指数
-        all_column_sum = np.sum(exp_column_sum)  # 求和
-
-        # 计算 Softmax 概率
-        choose_probability = exp_column_sum / all_column_sum
-        
-        selected_option = random.choices(CC_method, choose_probability, k=1)[0] #选择一个
-        record.method.append(selected_option)#记录选择的方式
     
-        #此处init_vector为vec类
-        init_vector = method_mapping[selected_option](D, m, global_C, best) 
+    
+    for _ in range(5):
 
-        #进入子空间 
-        for i in range(m):
+        fun_fitness = bench.get_function(question)
+        info = bench.get_info(question)
+        search_scope = info['upper']-info['lower']
+        sigma = search_scope*0.5
 
-            #sub_dimosions = len(init_vector.elements[i]) # 子代的维度
+        #参数初始化
+        D = info["dimension"]
+        m = 20
+        fes = 0
+        cycle_num = 5
+        cycle = 0
 
-            # 从全局中提取子代的 centroid
-            pos = init_vector.positions[i]
-            sub_centroid = global_Xw[pos]
+        sub_popsize = 50
 
-            # 从全局中提取子代的 C
-            sub_indices = init_vector.positions[i]
-            sub_C = global_C[sub_indices][:, sub_indices]
-            
-            # 重定向 sys.stdout 到一个空的文件对象，即禁止输出
-            sys.stdout = open('/dev/null', 'w')
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                sub_es = cma.CMAEvolutionStrategy(sub_centroid, sigma, {'popsize': sub_popsize,'bounds': [info['lower'], info['upper']]}) 
-                sub_es.boundary_handler('BoundPenalty')
-            sub_es.C = sub_C #设置初始协方差矩阵
+        # MetaBox接口
+        # F3= MetaBox_problem.F3(dim=D,shift=np.random.uniform(info['lower'], info['upper'], size=D),rotate=np.eye(D),bias=0,lb=info['lower'],ub=info['upper'])
 
+        #CC层初始化
+        CC_method = ["MiVD", "MaVD", "RD"]
 
-            sub_cycle = 0
-            sub_cycle_max = 10 #最多给5000fes
-            while not sub_es.stop() and sub_cycle < sub_cycle_max:
+        #cma-es初始化
+        random_vectors = np.random.uniform(info['lower'], info['upper'], size=(200, D))
+        global_C = np.eye(D)
+        global_Xw = np.random.uniform(info['lower'], info['upper'], size=D)
 
-                sub_cycle +=1
+        # 计算每个向量对应的函数值
+        function_values = np.array([problem(random_vectors[i]) for i in np.arange(200)])
 
-                offspring = sub_es.ask() #获取子代
+        # 找到最小值和对应的索引
+        min_index = np.argmin(function_values)
 
-                # 对子代进行封装，进入 Vec 类
-                sub_population = []
+        #记录器初始化
+        record = Record(cycle_num)   
 
-                for elements in offspring:
-                    ind = Vec(elements=np.array(elements), positions=init_vector.positions[i])
-                    sub_population.append(ind)
-
-                # 将子代的 offspring 转化为全局的 offspring
-                sub_offspring_to_global = []
-
-                for ind in sub_population:
-                    sub_ind_to_global = best.copy()
-                    sub_ind_to_global[ind.positions] = ind.elements
-                    sub_offspring_to_global.append(sub_ind_to_global)
-
-                #计算子代的fitness
-                sub_es.tell(offspring, np.array([problem(sub_offspring_to_global[i]) for i in range(sub_popsize)])) #更新子代
-
-                #从子代中提取最优解
-                sub_best = sub_es.result[0]
-                sub_best_fitness = sub_es.result[1]
-
-                if sub_best_fitness < best_fitness:
-                    best_fitness = sub_best_fitness
-                    best[init_vector.positions[i]] = sub_best
-                
-                # 将子代的最优解放入 global_Xw
-                global_Xw[init_vector.positions[i]] = sub_es.result[5]
-
-                # 将子代的 C 放入 global_C
-                global_C[np.ix_(init_vector.positions[i], init_vector.positions[i])] = sub_es.C
-
-            sigma = sub_es.sigma
+        best= random_vectors[min_index]
+        best_fitness = function_values[min_index]
+        record.best.insert(0,best_fitness) #记录第一次的best
 
         cycle += 1
         record.cycle_record.append(cycle)
         record.fitness_record.append(best_fitness)
 
-        if fes%5e6 == 0:
-            excel_data.append({'Question': question, 'FES': fes, 'BestFitness': best_fitness})
 
-    df = pd.DataFrame(excel_data)
-    # 将 DataFrame 写入 Excel 文件
-    output_file = os.path.join(output_folder, f'output_{question}.xlsx')
-    df.to_excel(output_file, index=False)
+        # 保存原始的 sys.stdout
+        original_stdout = sys.stdout
 
-    sys.stdout = original_stdout
-    print(best_fitness)
+        fes = 0
+
+        for _ in tqdm(range(300)):# tqdm(range(1),desc = "Overall Process"): #fes = 3e6:
+
+            #CC层选择：分解方式选择
+            column_sum = np.sum(record.per_record, axis=1)  # 按行求和
+            exp_column_sum = np.exp(column_sum)  # 对每个元素取指数
+            all_column_sum = np.sum(exp_column_sum)  # 求和
+
+            # 计算 Softmax 概率
+            choose_probability = exp_column_sum / all_column_sum
+            
+            selected_option = random.choices(CC_method, choose_probability, k=1)[0] #选择一个
+            record.method.append(selected_option)#记录选择的方式
+        
+            #此处init_vector为vec类
+            init_vector = method_mapping[selected_option](D, m, global_C, best) 
+
+            #进入子空间 
+            for i in range(m):
+
+                #sub_dimosions = len(init_vector.elements[i]) # 子代的维度
+
+                # 从全局中提取子代的 centroid
+                pos = init_vector.positions[i]
+                sub_centroid = global_Xw[pos]
+
+                # 从全局中提取子代的 C
+                sub_indices = init_vector.positions[i]
+                sub_C = global_C[sub_indices][:, sub_indices]
+                
+                # 重定向 sys.stdout 到一个空的文件对象，即禁止输出
+                sys.stdout = open('/dev/null', 'w')
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    sub_es = cma.CMAEvolutionStrategy(sub_centroid, sigma, {'popsize': sub_popsize,'bounds': [info['lower'], info['upper']]}) 
+                    sub_es.boundary_handler('BoundPenalty')
+                sub_es.C = sub_C #设置初始协方差矩阵
+
+
+                sub_cycle = 0
+                sub_cycle_max = 10 #最多给5000fes
+                while not sub_es.stop() and sub_cycle < sub_cycle_max:
+
+                    sub_cycle +=1
+
+                    offspring = sub_es.ask() #获取子代
+
+                    # 对子代进行封装，进入 Vec 类
+                    sub_population = []
+
+                    for elements in offspring:
+                        ind = Vec(elements=np.array(elements), positions=init_vector.positions[i])
+                        sub_population.append(ind)
+
+                    # 将子代的 offspring 转化为全局的 offspring
+                    sub_offspring_to_global = []
+
+                    for ind in sub_population:
+                        sub_ind_to_global = best.copy()
+                        sub_ind_to_global[ind.positions] = ind.elements
+                        sub_offspring_to_global.append(sub_ind_to_global)
+
+                    #计算子代的fitness
+                    sub_es.tell(offspring, np.array([problem(sub_offspring_to_global[i]) for i in range(sub_popsize)])) #更新子代
+
+                    #从子代中提取最优解
+                    sub_best = sub_es.result[0]
+                    sub_best_fitness = sub_es.result[1]
+
+                    if sub_best_fitness < best_fitness:
+                        best_fitness = sub_best_fitness
+                        best[init_vector.positions[i]] = sub_best
+                    
+                    # 将子代的最优解放入 global_Xw
+                    global_Xw[init_vector.positions[i]] = sub_es.result[5]
+
+                    # 将子代的 C 放入 global_C
+                    global_C[np.ix_(init_vector.positions[i], init_vector.positions[i])] = sub_es.C
+
+                sigma = sub_es.sigma
+
+            cycle += 1
+            record.cycle_record.append(cycle)
+            record.fitness_record.append(best_fitness)
+            
+            if fes % 5e5 == 0:
+                excel_data.append({'Question': question, 'FES': fes, 'BestFitness': best_fitness})
+
+
+# 转换为 pandas 的 DataFrame
+df = pd.DataFrame(excel_data)
+
+# 对相同的 Question 和 FES 取 BestFitness 的平均值
+result_df = df.groupby(['Question', 'FES'], as_index=False)['BestFitness'].mean()
+
+# 将结果转回为列表
+result_list = result_df.to_dict(orient='records')
+
+df_out = pd.DataFrame(result_list)
+
+output_file = os.path.join(output_folder, f'output-all_{1}.xlsx')
+
+df_out.to_excel(output_file, index=False)
+
+    # sys.stdout = original_stdout
+    # print(f"question:{question}, best_fitness: {best_fitness:e}")
+    #       if fes%5e5 == 0:
+    #           excel_data.append({'Question': question, 'FES': fes, 'BestFitness': best_fitness})
+
+    # df = pd.DataFrame(excel_data)
+    # # 将 DataFrame 写入 Excel 文件
+    # output_file = os.path.join(output_folder, f'output_{question}.xlsx')
+    # df.to_excel(output_file, index=False)
+
+    # sys.stdout = original_stdout
+    # print(best_fitness)
 
 
 

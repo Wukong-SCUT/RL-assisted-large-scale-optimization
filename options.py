@@ -42,7 +42,7 @@ def get_options(args=None):
     parser.add_argument('--run_name', default='run_name', help='name to identify the run') 
     parser.add_argument('--RL_agent', default='ppo', choices=['ppo'], help='RL Training algorithm')
     parser.add_argument('--eval_only', action='store_true', default=False, help='switch to inference mode')
-    parser.add_argument('--seed', type=int, default=1234, help='random seed to use')
+    parser.add_argument('--seed', type=int, default=2023, help='random seed to use')
 
 
 

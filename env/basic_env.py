@@ -91,6 +91,8 @@ class cmaes(gym.Env):
         super(cmaes, self).__init__() 
         bench = Benchmark()
 
+        self.question = question
+
         self.m = 20 #opts.m
         self.sub_popsize = 50 #opts.sub_popsize
 
@@ -164,6 +166,7 @@ class cmaes(gym.Env):
         g_best_fitness = self.best_fitness
 
         self.origin_g_best_fitness = g_best_fitness
+        self.g_best_fitness_history = g_best_fitness
 
         g_best_fitness_boosting_ratio = 1
 
@@ -300,24 +303,15 @@ class cmaes(gym.Env):
             fes_remaining/1e6, sigma/self.search_scope_half
                                 ] 
         
-        # 找到最大值和对应的索引
-        # max_value, max_index = max((value, index) for index, value in enumerate(self.state))
 
-        # # 获取对应的名称
-        # max_name = [
-        #      "Xw_mean/search_scope_half", "Xw_max/search_scope_half", "Xw_min/search_scope_half",
-        #     "correlation_matrix_max", "correlation_matrix_min", "correlation_matrix_mean",
-        #     "g_best_max/search_scope_half", "g_best_min/search_scope_half", "g_best_mean/search_scope_half", 
-        #     "g_best_fitness_boosting_ratio",
-        #     "fes_remaining/1e6"
-        # ][max_index]
 
-        # # 打印结果
-        # sys.stdout = original_stdout
-        # print(f"The maximum value is {max_value} for the state variable {max_name}.")
+
+
 
         # 例如，这里定义一个简单的奖励函数
-        reward = g_best_fitness_boosting_ratio
+        reward = (self.g_best_fitness_history - g_best_fitness) / self.origin_g_best_fitness
+
+        self.g_best_fitness_history = g_best_fitness
 
         if fes_remaining <= 0:
             self.done = True
@@ -326,7 +320,7 @@ class cmaes(gym.Env):
         else:
             self.done = False
 
-        return self.state, reward, self.done, {"gbest_val": self.best_fitness}
+        return self.state, reward, self.done, {"question":self.question, "Fes":self.fes, "gbest_val": self.best_fitness}
     
 #测试例子
 if __name__ == '__main__':
